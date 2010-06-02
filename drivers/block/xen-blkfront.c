@@ -41,7 +41,7 @@
 #include <linux/cdrom.h>
 #include <linux/module.h>
 #include <linux/slab.h>
-#include <linux/smp_lock.h>
+#include <linux/mutex.h>
 #include <linux/scatterlist.h>
 
 #include <xen/xen.h>
@@ -68,6 +68,7 @@ struct blk_shadow {
 	unsigned long frame[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 };
 
+static DEFINE_MUTEX(blkfront_mutex);
 static const struct block_device_operations xlvbd_block_fops;
 
 #define BLK_RING_SIZE __RING_SIZE((struct blkif_sring *)0, PAGE_SIZE)
@@ -1150,7 +1151,7 @@ static int blkif_open(struct block_device *bdev, fmode_t mode)
 	struct blkfront_info *info;
 	int err = 0;
 
-	lock_kernel();
+	mutex_lock(&blkfront_mutex);
 
 	info = disk->private_data;
 	if (!info) {
@@ -1168,7 +1169,7 @@ static int blkif_open(struct block_device *bdev, fmode_t mode)
 	mutex_unlock(&info->mutex);
 
 out:
-	unlock_kernel();
+	mutex_unlock(&blkfront_mutex);
 	return err;
 }
 
@@ -1178,7 +1179,7 @@ static int blkif_release(struct gendisk *disk, fmode_t mode)
 	struct block_device *bdev;
 	struct xenbus_device *xbdev;
 
-	lock_kernel();
+	mutex_lock(&blkfront_mutex);
 
 	bdev = bdget_disk(disk, 0);
 	bdput(bdev);
@@ -1212,7 +1213,7 @@ static int blkif_release(struct gendisk *disk, fmode_t mode)
 	}
 
 out:
-	unlock_kernel();
+	mutex_unlock(&blkfront_mutex);
 	return 0;
 }
 

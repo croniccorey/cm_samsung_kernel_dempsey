@@ -578,7 +578,7 @@ static int i2o_block_open(struct block_device *bdev, fmode_t mode)
 	if (!dev->i2o_dev)
 		return -ENODEV;
 
-	lock_kernel();
+	mutex_lock(&i2o_block_mutex);
 	if (dev->power > 0x1f)
 		i2o_block_device_power(dev, 0x02);
 
@@ -587,7 +587,7 @@ static int i2o_block_open(struct block_device *bdev, fmode_t mode)
 	i2o_block_device_lock(dev->i2o_dev, -1);
 
 	osm_debug("Ready.\n");
-	unlock_kernel();
+	mutex_unlock(&i2o_block_mutex);
 
 	return 0;
 };
@@ -618,7 +618,7 @@ static int i2o_block_release(struct gendisk *disk, fmode_t mode)
 	if (!dev->i2o_dev)
 		return 0;
 
-	lock_kernel();
+	mutex_lock(&i2o_block_mutex);
 	i2o_block_device_flush(dev->i2o_dev);
 
 	i2o_block_device_unlock(dev->i2o_dev, -1);
@@ -629,7 +629,7 @@ static int i2o_block_release(struct gendisk *disk, fmode_t mode)
 		operation = 0x24;
 
 	i2o_block_device_power(dev, operation);
-	unlock_kernel();
+	mutex_unlock(&i2o_block_mutex);
 
 	return 0;
 }
