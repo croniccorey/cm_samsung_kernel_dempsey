@@ -196,12 +196,11 @@ static void ps3disk_do_request(struct ps3_storage_device *dev,
 	dev_dbg(&dev->sbd.core, "%s:%u\n", __func__, __LINE__);
 
 	while ((req = blk_fetch_request(q))) {
-		if (req->cmd_type == REQ_TYPE_FS) {
-			if (ps3disk_submit_request_sg(dev, req))
-				break;
-		} else if (req->cmd_type == REQ_TYPE_LINUX_BLOCK &&
-			   req->cmd[0] == REQ_LB_OP_FLUSH) {
+		if (req->cmd_flags & REQ_FLUSH) {
 			if (ps3disk_submit_flush_request(dev, req))
+				break;
+		} else if (req->cmd_type == REQ_TYPE_FS) {
+			if (ps3disk_submit_request_sg(dev, req))
 				break;
 		} else {
 			blk_dump_rq_flags(req, DEVICE_NAME " bad request");
@@ -257,8 +256,7 @@ static irqreturn_t ps3disk_interrupt(int irq, void *data)
 		return IRQ_HANDLED;
 	}
 
-	if (req->cmd_type == REQ_TYPE_LINUX_BLOCK &&
-	    req->cmd[0] == REQ_LB_OP_FLUSH) {
+	if (req->cmd_flags & REQ_FLUSH) {
 		read = 0;
 		op = "flush";
 	} else {
@@ -396,16 +394,6 @@ static int ps3disk_identify(struct ps3_storage_device *dev)
 	priv->raw_capacity = ata_id_n_sectors(id);
 	ata_id_c_string(id, priv->model, ATA_ID_PROD, sizeof(priv->model));
 	return 0;
-}
-
-static void ps3disk_prepare_flush(struct request_queue *q, struct request *req)
-{
-	struct ps3_storage_device *dev = q->queuedata;
-
-	dev_dbg(&dev->sbd.core, "%s:%u\n", __func__, __LINE__);
-
-	req->cmd_type = REQ_TYPE_LINUX_BLOCK;
-	req->cmd[0] = REQ_LB_OP_FLUSH;
 }
 
 static unsigned long ps3disk_mask;
