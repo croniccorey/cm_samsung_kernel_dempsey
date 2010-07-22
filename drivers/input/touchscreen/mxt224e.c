@@ -1262,9 +1262,9 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 		if(msg[0] == 0x1)
 		{
 			//printk(KERN_ERR"[TSP] Starting irq with 0x%2x, 0x%2x, 0x%2x, 0x%2x, 0x%2x, 0x%2x, 0x%2x, 0x%2x \n", msg[0], msg[1], msg[2], msg[3], msg[4], msg[5], msg[6], msg[7]);
-			if ((msg[1]&0x10) == 0x10) /* caliration */
+//			if ((msg[1]&0x10) == 0x10) /* caliration */
 	//			printk(KERN_ERR"[TSP] Calibration!!!!!!");
-			else if ((msg[1]&0x40) == 0x40) /* overflow */
+			if ((msg[1]&0x40) == 0x40) /* overflow */
 			{
 				printk(KERN_ERR"[TSP] Overflow!!!!!!");
 				if(is_cable_attached == 0)
