@@ -479,6 +479,7 @@ static int do_bio_filebacked(struct loop_device *lo, struct bio *bio)
 
 	if (bio_rw(bio) == WRITE) {
 		struct file *file = lo->lo_backing_file;
+
 		if (bio->bi_rw & REQ_FLUSH) {
 
 			ret = vfs_fsync(file, 0);
