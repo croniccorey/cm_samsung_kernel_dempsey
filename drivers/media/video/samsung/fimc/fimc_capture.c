@@ -889,7 +889,7 @@ static int fimc_fmt_depth(struct fimc_control *ctrl, struct v4l2_format *f)
 int fimc_s_fmt_vid_capture(struct file *file, void *fh, struct v4l2_format *f)
 {
 	struct fimc_control *ctrl = ((struct fimc_prv_data *)fh)->ctrl;
-	struct fimc_capinfo *cap = ctrl->cap;
+	struct fimc_capinfo *cap;
 	int ret = 0;
 	int depth;
 
