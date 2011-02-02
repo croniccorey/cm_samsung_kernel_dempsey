@@ -408,6 +408,7 @@ void android_enable_function(struct usb_function *f, int enable)
 		if (!strcmp(f->name, "accessory") && enable) {
 			struct usb_function		*func;
 
+
 		    /* disable everything else (and keep adb for now) */
 			list_for_each_entry(func, &android_config_driver.functions, list) {
 				if (strcmp(func->name, "accessory")
