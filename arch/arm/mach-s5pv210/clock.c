@@ -453,7 +453,7 @@ static struct clk init_clocks_disable[] = {
 		.parent		= &clk_pclk_psys.clk,
 #endif
 		.enable		= s5pv210_clk_ip3_ctrl,
-		.ctrlbit	= (1<<10),
+		.ctrlbit	= (1 << 10),
 	}, {
 		.name		= "i2c",
 		.id		= 2,
