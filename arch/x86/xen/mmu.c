@@ -1646,6 +1646,11 @@ static __init void xen_map_identity_early(pmd_t *pmd, unsigned long max_pfn)
 				max_pfn_mapped = pfn;
 #endif
 
+#ifdef CONFIG_X86_32
+			if (pfn > max_pfn_mapped)
+				max_pfn_mapped = pfn;
+#endif
+
 			if (!pte_none(pte_page[pteidx]))
 				continue;
 
