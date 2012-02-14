@@ -639,8 +639,8 @@ static void __rpc_execute(struct rpc_task *task)
 			 */
 			do_action = task->tk_action;
 			if (do_action == NULL)
-				break;
-		}
+ 				break;
+ 		}
 		do_action(task);
 
 		/*
