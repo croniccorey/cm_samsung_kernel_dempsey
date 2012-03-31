@@ -90,7 +90,7 @@ dma_addr_t s5p_get_media_membase_bank(int bank)
 }
 EXPORT_SYMBOL(s5p_get_media_membase_bank);
 
-void s5p_reserve_bootmem(struct s5p_media_device *mdevs, int nr_mdevs)
+void s5p_reserve_bootmem(struct s5p_media_device *mdevs,int nr_mdevs)
 {
 	struct s5p_media_device *mdev;
 	int i;
