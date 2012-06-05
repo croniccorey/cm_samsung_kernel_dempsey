@@ -419,7 +419,7 @@ static long mfc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 		break;
 
-	case IOCTL_MFC_BUF_CACHE:
+       case IOCTL_MFC_BUF_CACHE:
 		mutex_lock(&mfc_mutex);
 
 		in_param.ret_code = MFCINST_RET_OK;
