@@ -20,9 +20,6 @@
 #include <linux/slab.h>
 #include <linux/scatterlist.h>
 #include <linux/regulator/consumer.h>
-#include <mach/gpio.h>
-#include <mach/gpio-aries.h>
-#include <plat/gpio-cfg.h>
 
 #include <linux/leds.h>
 
@@ -655,12 +652,8 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_data *data)
 	}
 
 	if (count >= 0xF) {
-//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100507 : add LOG for MoviNAND debuging
-		/*
 		printk(KERN_WARNING "%s: Too large timeout requested!\n",
 			mmc_hostname(host->mmc));
-		*/
-//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100507 : add LOG for MoviNAND debuging
 		count = 0xE;
 	}
 
@@ -1363,11 +1356,8 @@ static void sdhci_tasklet_card(unsigned long param)
 	}
 
 	spin_unlock_irqrestore(&host->lock, flags);
-#if defined (CONFIG_S5PC110_HAWK_BOARD)
-		mmc_detect_change(host->mmc, msecs_to_jiffies(300));
-#else
+
 	mmc_detect_change(host->mmc, msecs_to_jiffies(200));
-#endif
 }
 
 static void sdhci_tasklet_finish(unsigned long param)
@@ -1377,6 +1367,13 @@ static void sdhci_tasklet_finish(unsigned long param)
 	struct mmc_request *mrq;
 
 	host = (struct sdhci_host*)param;
+
+        /*
+         * If this tasklet gets rescheduled while running, it will
+         * be run again afterwards but without any active request.
+         */
+	if (!host->mrq)
+		return;
 
         /*
          * If this tasklet gets rescheduled while running, it will
@@ -1420,7 +1417,8 @@ static void sdhci_tasklet_finish(unsigned long param)
 		sdhci_reset(host, SDHCI_RESET_DATA);
 	}
 out:
-	if(readl(host->ioaddr + SDHCI_PRESENT_STATE) & SDHCI_DATA_INHIBIT)
+	if((readl(host->ioaddr + SDHCI_PRESENT_STATE) & SDHCI_DATA_INHIBIT) ||
+			(host->quirks & SDHCI_QUIRK_MUST_MAINTAIN_CLOCK))
 		mod_timer(&host->busy_check_timer, jiffies + msecs_to_jiffies(10));
 	else
 		sdhci_disable_clock_card(host);
@@ -1479,7 +1477,8 @@ static void sdhci_busy_check_timer(unsigned long data)
 
 	spin_lock_irqsave(&host->lock, flags);
 
-	if(readl(host->ioaddr + SDHCI_PRESENT_STATE) & (SDHCI_CMD_INHIBIT | SDHCI_DATA_INHIBIT))
+	if((readl(host->ioaddr + SDHCI_PRESENT_STATE) & (SDHCI_CMD_INHIBIT | SDHCI_DATA_INHIBIT)) ||
+			(host->quirks & SDHCI_QUIRK_MUST_MAINTAIN_CLOCK))
 		mod_timer(&host->busy_check_timer, jiffies + msecs_to_jiffies(10));
 	else
 		sdhci_disable_clock_card(host);
@@ -1749,10 +1748,10 @@ int sdhci_suspend_host(struct sdhci_host *host, pm_message_t state)
 
 	if (host->irq)
 		disable_irq(host->irq);
-
+#ifndef CONFIG_SAMSUNG_FASCINATE
 	if (host->vmmc)
 		ret = regulator_disable(host->vmmc);
-
+#endif
 	return ret;
 }
 
@@ -1763,21 +1762,13 @@ int sdhci_resume_host(struct sdhci_host *host)
 	int ret = 0;
 	struct mmc_host *mmc = host->mmc;
 
-#if ! defined (CONFIG_S5PC110_HAWK_BOARD) 
-	/* 20110125 - power on moviNAND in case of 27nm moviNAND */
-	if(mmc->card && (mmc->card->type==MMC_TYPE_MMC)) {
-		gpio_set_value(GPIO_MASSMEMORY_EN, 1);	
-	#ifdef CONFIG_S5PC110_DEMPSEY_BOARD
-		gpio_set_value(GPIO_MASSMEMORY_EN2, 1);	
-	#endif
-	}
-#endif
-
+#ifndef CONFIG_SAMSUNG_FASCINATE
 	if (host->vmmc) {
 		int ret = regulator_enable(host->vmmc);
 		if (ret)
 			return ret;
 	}
+#endif
 
 	if (host->flags & (SDHCI_USE_SDMA | SDHCI_USE_ADMA)) {
 		if (host->ops->enable_dma)
@@ -2055,8 +2046,8 @@ int sdhci_add_host(struct sdhci_host *host)
 	if (ret)
 		goto untasklet;
 
-	if (mmc->index == 1) {
-	host->vmmc = regulator_get(mmc_dev(mmc), "vtf");
+#ifndef CONFIG_SAMSUNG_FASCINATE
+	host->vmmc = regulator_get(mmc_dev(mmc), "vmmc");
 	if (IS_ERR(host->vmmc)) {
 		printk(KERN_INFO "%s: no vmmc regulator found\n", mmc_hostname(mmc));
 		host->vmmc = NULL;
@@ -2065,7 +2056,7 @@ int sdhci_add_host(struct sdhci_host *host)
 			mdelay(30);
 		regulator_enable(host->vmmc);
 	}
-	}
+#endif
 
 	sdhci_init(host, 0);
 
@@ -2152,10 +2143,12 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
 	tasklet_kill(&host->card_tasklet);
 	tasklet_kill(&host->finish_tasklet);
 
+#ifndef CONFIG_SAMSUNG_FASCINATE
 	if (host->vmmc) {
 		regulator_disable(host->vmmc);
 		regulator_put(host->vmmc);
 	}
+#endif
 
 	kfree(host->adma_desc);
 	kfree(host->align_buffer);
