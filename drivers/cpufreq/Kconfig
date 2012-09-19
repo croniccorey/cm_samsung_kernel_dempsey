@@ -128,7 +128,7 @@ config CPU_FREQ_DEFAULT_GOV_INTERACTIVE
 	  loading your cpufreq low-level hardware driver, using the
 	  'interactive' governor for latency-sensitive workloads.
 
-endchoice
+	   If in doubt, say Y.
 
 config CPU_FREQ_GOV_PERFORMANCE
 	tristate "'performance' governor"
