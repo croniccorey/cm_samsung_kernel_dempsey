@@ -705,6 +705,9 @@ skip_lpage:
 		if (r)
 			goto out_free;
 	}
+	} else
+		kvm_iommu_unmap_pages(kvm, &old);
+
 #endif
 
 	r = -ENOMEM;
