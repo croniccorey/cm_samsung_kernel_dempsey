@@ -2457,12 +2457,15 @@ static ssize_t set_mxt_firm_status_show(struct device *dev, struct device_attrib
 
 }
 
-static ssize_t key_threshold_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t tsp_threshold_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%u\n", threshold);
+	if (copy_data->mxt_version_disp == 0x80)
+    return sprintf(buf, "%u\n", copy_data->threshold);
+  else
+    return sprintf(buf, "%u\n", copy_data->threshold_e);
 }
 
-static ssize_t key_threshold_store(struct device *dev, struct device_attribute *attr,
+static ssize_t tsp_threshold_store(struct device *dev, struct device_attribute *attr,
 								const char *buf, size_t size)
 {
 	/*TO DO IT*/
@@ -2472,6 +2475,13 @@ static ssize_t key_threshold_store(struct device *dev, struct device_attribute *
 	int ret;
 	u16 address = 0;
 	u16 size_one;
+	int threshold;
+
+	if (copy_data->mxt_version_disp == 0x80)
+		threshold = copy_data->threshold;
+	else
+		threshold = copy_data->threshold_e;
+
 	if (sscanf(buf, "%d", &threshold) == 1) {
 		printk(KERN_ERR "[TSP] threshold value %d\n", threshold);
 		ret = get_object_info(copy_data, TOUCH_MULTITOUCHSCREEN_T9, &size_one, &address);
@@ -2615,7 +2625,7 @@ static DEVICE_ATTR(set_module_on, S_IRUGO | S_IWUSR | S_IWGRP, set_module_on_sho
 */
 static DEVICE_ATTR(tsp_firm_update, S_IRUGO | S_IWUSR | S_IWGRP, set_mxt_update_show, NULL);		/* firmware update */
 static DEVICE_ATTR(tsp_firm_update_status, S_IRUGO | S_IWUSR | S_IWGRP, set_mxt_firm_status_show, NULL);	/* firmware update status return */
-static DEVICE_ATTR(tsp_threshold, S_IRUGO | S_IWUSR | S_IWGRP, key_threshold_show, key_threshold_store);	/* touch threshold return, store */
+static DEVICE_ATTR(tsp_threshold, S_IRUGO | S_IWUSR | S_IWGRP, tsp_threshold_show, tsp_threshold_store);	/* touch threshold return, store */
 static DEVICE_ATTR(tsp_firm_version_phone, S_IRUGO | S_IWUSR | S_IWGRP, set_mxt_firm_version_show, NULL);/* PHONE*/	/* firmware version resturn in phone driver version */
 static DEVICE_ATTR(tsp_firm_version_panel, S_IRUGO | S_IWUSR | S_IWGRP, set_mxt_firm_version_read_show, NULL);/*PART*/	/* firmware version resturn in TSP panel version */
 #ifdef CONFIG_TARGET_LOCALE_KOR
