@@ -825,7 +825,7 @@ static void usb_stor_scan_dwork(struct work_struct *work)
 	dev_dbg(dev, "starting scan\n");
 
 /* For bulk-only devices, determine the max LUN value */
-if (us->protocol == US_PR_BULK && !(us->fflags & US_FL_SINGLE_LUN)) {
+if (us->protocol == USB_PR_BULK && !(us->fflags & US_FL_SINGLE_LUN)) {
  mutex_lock(&us->dev_mutex);
 us->max_lun = usb_stor_Bulk_max_lun(us);
 mutex_unlock(&us->dev_mutex);
@@ -944,6 +944,15 @@ int usb_stor_probe2(struct us_data *us)
 		goto BadDevice;
 	}
 
+/* Submit the delayed_work for SCSI-device scanning */
+	set_bit(US_FLIDX_SCAN_PENDING, &us->dflags);
+
+if (delay_use > 0)
+dev_dbg(dev, "waiting for device to settle before scanning\n");
+queue_delayed_work(system_freezable_wq, &us->scan_dwork,
+delay_use * HZ);
+
+	return 0;
 
 	/* We come here if there are any problems */
 BadDevice:
