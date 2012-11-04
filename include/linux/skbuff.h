@@ -1380,6 +1380,12 @@ static inline void skb_mac_header_rebuild(struct sk_buff *skb)
   }
 }
 
+static inline int skb_checksum_start_offset(const struct sk_buff *skb)
+{
+	return skb->csum_start - skb_headroom(skb);
+
+}
+
 static inline int skb_transport_offset(const struct sk_buff *skb)
 {
 	return skb_transport_header(skb) - skb->data;
