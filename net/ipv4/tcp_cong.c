@@ -228,6 +228,7 @@ out:
 	spin_unlock(&tcp_cong_list_lock);
 	kfree(saved_clone);
 
+	kfree(saved_clone);
 	return ret;
 }
 
