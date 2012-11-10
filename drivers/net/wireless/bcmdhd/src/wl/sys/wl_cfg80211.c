@@ -2879,6 +2879,7 @@ wl_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
 	bzero(&bssid, sizeof(bssid));
 	if (!wl_get_drv_status(wl, DISCONNECTING, dev))
 		wl_update_prof(wl, dev, NULL, (void *)&bssid, WL_PROF_BSSID);
+		wl_update_prof(wl, dev, NULL, sme->bssid, WL_PROF_PENDING_BSSID);
 
 	if (!memcmp(sme->ssid, WL_P2P_WILDCARD_SSID, WL_P2P_WILDCARD_SSID_LEN) &&
 		(dev != wl_to_prmry_ndev(wl))) {
@@ -6320,6 +6321,14 @@ wl_bss_connect_done(struct wl_priv *wl, struct net_device *ndev,
 		wl_cfg80211_scan_abort(wl, ndev);
 	}
 #endif /* ESCAN_RESULT_PATCH */
+
+	if (is_zero_ether_addr(curbssid)) {
+		curbssid = wl_read_prof(wl, ndev, WL_PROF_PENDING_BSSID);
+		if (is_zero_ether_addr(curbssid)) {
+			WL_ERR(("Invalid BSSID\n"));
+			curbssid = NULL;
+		}
+	}
 	if (wl_get_drv_status(wl, CONNECTING, ndev)) {
 		wl_clr_drv_status(wl, CONNECTING, ndev);
 		if (completed) {
@@ -6342,7 +6351,9 @@ wl_bss_connect_done(struct wl_priv *wl, struct net_device *ndev,
 			conn_info->req_ie_len,
 			conn_info->resp_ie,
 			conn_info->resp_ie_len,
-			completed ? WLAN_STATUS_SUCCESS : WLAN_STATUS_AUTH_TIMEOUT,
+			completed ? WLAN_STATUS_SUCCESS :
+			(e->reason) ? ntoh32(e->reason) :
+			WLAN_STATUS_UNSPECIFIED_FAILURE,
 			GFP_KERNEL);
 		if (completed)
 			WL_SCAN2(("Report connect result - connection succeeded(%d)\n",
@@ -8557,6 +8568,9 @@ static void *wl_read_prof(struct wl_priv *wl, struct net_device *ndev, s32 item)
 	case WL_PROF_BSSID:
 		rptr = profile->bssid;
 		break;
+	case WL_PROF_PENDING_BSSID:
+		rptr = profile->pending_bssid;
+		break;
 	case WL_PROF_SSID:
 		rptr = &profile->ssid;
 	case WL_PROF_CHAN:
@@ -8594,6 +8608,12 @@ wl_update_prof(struct wl_priv *wl, struct net_device *ndev,
 			memcpy(profile->bssid, data, ETHER_ADDR_LEN);
 		else
 			memset(profile->bssid, 0, ETHER_ADDR_LEN);
+		break;
+	case WL_PROF_PENDING_BSSID:
+		if (data)
+			memcpy(profile->pending_bssid, data, ETHER_ADDR_LEN);
+		else
+			memset(profile->pending_bssid, 0, ETHER_ADDR_LEN);
 		break;
 	case WL_PROF_SEC:
 		memcpy(&profile->sec, data, sizeof(profile->sec));
