@@ -507,6 +507,7 @@ static struct clk init_clocks_disable[] = {
 		.enable		= s5pv210_clk_ip3_ctrl,
 		.ctrlbit	= S5P_CLKGATE_IP3_PCM2,
 	}, {
+#if 0
 		.name		= "pcm",
 		.id		= 1,
 		.parent		= &clk_pclk_psys.clk,
@@ -519,6 +520,7 @@ static struct clk init_clocks_disable[] = {
 		.enable		= s5pv210_clk_ip3_ctrl,
 		.ctrlbit	= S5P_CLKGATE_IP3_PCM0,
 	}, {
+#endif
 		.name		= "i2c-hdmiphy",
 		.id		= -1,
 #if defined (CONFIG_S5PC110_DEMPSEY_BOARD)
@@ -662,12 +664,14 @@ static struct clk init_clocks[] = {
 		.enable		= s5pv210_clk_ip3_ctrl,
 		.ctrlbit	= (1 << 20),
 	}, {
+#if 1
 		.name		= "i2s_v50",
 		.id		= 0,
 		.parent		= &clk_p,
 		.enable		= s5pv210_clk_ip3_ctrl,
 		.ctrlbit	= S5P_CLKGATE_IP3_I2S0 | S5P_CLKGATE_IP3_PCM0,
 	}, {
+#endif
 		.name		= "clk_out",
 		.id		= -1,
 		.ops		= &s5pc11x_clkout_ops,
