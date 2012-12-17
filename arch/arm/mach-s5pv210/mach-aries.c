@@ -540,7 +540,6 @@ static struct regulator_consumer_supply ldo7_consumer[] = {
 
 static struct regulator_consumer_supply ldo8_consumer[] = {
 	REGULATOR_SUPPLY("usb_core", NULL),
-	REGULATOR_SUPPLY("tvout", NULL),
 };
 
 //#if defined(CONFIG_VIDEO_S5K5CCGX) || defined(CONFIG_VIDEO_SR030PC30)
@@ -5301,8 +5300,6 @@ static int m5mo_power_down()
 extern unsigned int ldo3_status;
 extern unsigned int ldo8_status; //Subhransu20110304
 
-extern void __s5p_hdmi_phy_power_offtest(void); //Subhransu20110304
-
 
 //Subhransu20110304
 void ldo8_control_and_hdmi_phyoff_test()
@@ -5311,16 +5308,13 @@ void ldo8_control_and_hdmi_phyoff_test()
 	printk(KERN_ERR "[%s]: ldo8_status = %d\n", __func__, ldo8_status);
 	Set_MAX8998_PM_REG(ELDO8, 1 );
 	ldo8_status = 1;
-	__s5p_hdmi_phy_power_offtest();
 #endif
 	return 0;
 }
 
 
 extern int tv_power_status; 
-#ifdef CONFIG_S5PC110_DEMPSEY_BOARD
-extern void __s5p_hdmi_phy_power_offtest();
-#endif
+
 static struct regulator *cam_mipi_c_regulator;
 static struct regulator *cam_mipi_regulator;
 void s3c_csis_power(int enable)
@@ -5366,7 +5360,6 @@ int err;
 				pr_err("Failed to enable usb_core during cam \n");
 				}
 		
-		__s5p_hdmi_phy_power_offtest();
 #endif
 
 	}
@@ -7483,9 +7476,7 @@ static struct platform_device *aries_devices[] __initdata = {
 	&s3c_device_hsmmc3,
 #endif
 #endif
-#ifdef CONFIG_VIDEO_TV20
-        &s5p_device_tvout,
-#endif
+
 	&sec_device_battery,
 	&s3c_device_i2c10,
 
