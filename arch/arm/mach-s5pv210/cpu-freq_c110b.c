@@ -802,7 +802,7 @@ static int s5pv210_cpufreq_resume(struct cpufreq_policy *policy)
 
 	if (level == CPUFREQ_TABLE_END) { /* Not found */
 		pr_err("[%s:%d] clock speed does not match: "
-				"%d. Using L1 of 800MHz.\n",
+				"%d. Using L3 of 800MHz.\n",
 				__FILE__, __LINE__, rate);
 		level = L3;
 	}
