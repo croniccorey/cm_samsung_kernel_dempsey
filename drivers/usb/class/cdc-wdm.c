@@ -720,7 +720,7 @@ next_desc:
 		goto err;
 
 	desc->inbuf = usb_alloc_coherent(interface_to_usbdev(intf),
-					 desc->wMaxCommand,
+					 desc->bMaxPacketSize0,
 					 GFP_KERNEL,
 					 &desc->response->transfer_dma);
 	if (!desc->inbuf)
