@@ -47,12 +47,7 @@ CONFIG_KERNEL_GZIP=y
 # CONFIG_KERNEL_BZIP2 is not set
 # CONFIG_KERNEL_LZMA is not set
 # CONFIG_KERNEL_LZO is not set
-<<<<<<< HEAD:arch/arm/configs/hawk_rev02_defconfig
 # CONFIG_SWAP is not set
-=======
-CONFIG_KERNEL_XZ=y
-CONFIG_SWAP=y
->>>>>>> 2dcc7ee... Add Swap Zram function:arch/arm/configs/cyanogenmod_p1l_defconfig
 CONFIG_SYSVIPC=y
 CONFIG_SYSVIPC_SYSCTL=y
 # CONFIG_POSIX_MQUEUE is not set
@@ -435,10 +430,6 @@ CONFIG_VIRT_TO_BUS=y
 CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
 CONFIG_ALIGNMENT_TRAP=y
 # CONFIG_UACCESS_WITH_MEMCPY is not set
-CONFIG_ZRAM=y
-# CONFIG_ZRAM_DEBUG is not set
-CONFIG_XVMALLOC=y
-# CONFIG_ZCACHE is not set
 
 #
 # Boot options
@@ -1786,11 +1777,7 @@ CONFIG_INOTIFY_USER=y
 # CONFIG_QUOTA is not set
 # CONFIG_AUTOFS_FS is not set
 # CONFIG_AUTOFS4_FS is not set
-<<<<<<< HEAD:arch/arm/configs/hawk_rev02_defconfig
 # CONFIG_FUSE_FS is not set
-=======
-CONFIG_FUSE_FS=m
->>>>>>> 2dcc7ee... Add Swap Zram function:arch/arm/configs/cyanogenmod_p1l_defconfig
 CONFIG_GENERIC_ACL=y
 
 #
@@ -1823,23 +1810,6 @@ CONFIG_PROC_PAGE_MONITOR=y
 CONFIG_SYSFS=y
 CONFIG_TMPFS=y
 CONFIG_TMPFS_POSIX_ACL=y
-<<<<<<< HEAD:arch/arm/configs/hawk_rev02_defconfig
-=======
-CONFIG_YAFFS_FS=y
-CONFIG_YAFFS_YAFFS1=y
-# CONFIG_YAFFS_9BYTE_TAGS is not set
-# CONFIG_YAFFS_DOES_ECC is not set
-CONFIG_YAFFS_YAFFS2=y
-CONFIG_YAFFS_AUTO_YAFFS2=y
-# CONFIG_YAFFS_DISABLE_TAGS_ECC is not set
-# CONFIG_YAFFS_DISABLE_WIDE_TNODES is not set
-# CONFIG_YAFFS_ALWAYS_CHECK_CHUNK_ERASED is not set
-CONFIG_YAFFS_SHORT_NAMES_IN_RAM=y
-# CONFIG_YAFFS_EMPTY_LOST_AND_FOUND is not set
-# CONFIG_YAFFS_DISABLE_BLOCK_REFRESHING is not set
-# CONFIG_YAFFS_DISABLE_BACKGROUND is not set
-CONFIG_YAFFS_XATTR=y
->>>>>>> 2dcc7ee... Add Swap Zram function:arch/arm/configs/cyanogenmod_p1l_defconfig
 # CONFIG_HUGETLB_PAGE is not set
 # CONFIG_CONFIGFS_FS is not set
 CONFIG_MISC_FILESYSTEMS=y
@@ -2179,13 +2149,6 @@ CONFIG_LIBCRC32C=y
 CONFIG_ZLIB_INFLATE=y
 CONFIG_ZLIB_DEFLATE=y
 CONFIG_DECOMPRESS_GZIP=y
-<<<<<<< HEAD:arch/arm/configs/hawk_rev02_defconfig
-=======
-CONFIG_DECOMPRESS_BZIP2=y
-CONFIG_DECOMPRESS_LZMA=y
-CONFIG_LZO_COMPRESS=y
-CONFIG_LZO_DECOMPRESS=y
->>>>>>> 2dcc7ee... Add Swap Zram function:arch/arm/configs/cyanogenmod_p1l_defconfig
 CONFIG_REED_SOLOMON=y
 CONFIG_REED_SOLOMON_ENC8=y
 CONFIG_REED_SOLOMON_DEC8=y
