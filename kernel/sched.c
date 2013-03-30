@@ -1259,6 +1259,37 @@ static void sched_avg_update(struct rq *rq)
 	}
 }
 
+/*
+ * This routine returns the cpu which is non-idle. If the local CPU isn't idle
+ * OR all cpus are idle, local cpu is returned back. If local cpu is idle, then
+ * we must look for another CPU which isn't idle.
+ */
+int sched_select_non_idle_cpu(void)
+{
+  struct sched_domain *sd;
+  int cpu = smp_processor_id();
+  int i;
+
+  /* If Current cpu isn't idle, don't migrate anything */
+  if (!idle_cpu(cpu))
+    return cpu;
+
+  rcu_read_lock();
+  for_each_domain(cpu, sd) {
+    for_each_cpu(i, sched_domain_span(sd)) {
+      if (i == cpu)
+        continue;
+      if (!idle_cpu(i)) {
+        cpu = i;
+        goto unlock;
+      }
+    }
+  }
+unlock:
+  rcu_read_unlock();
+  return cpu;
+} 
+
 static void sched_rt_avg_update(struct rq *rq, u64 rt_delta)
 {
 	rq->rt_avg += rt_delta;
