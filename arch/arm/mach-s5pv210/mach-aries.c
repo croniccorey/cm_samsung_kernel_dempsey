@@ -2572,9 +2572,9 @@ static struct s3c_adc_mach_info s3c_adc_platform __initdata = {
 
 /* There is a only common mic bias gpio in aries H/W */
 static DEFINE_SPINLOCK(mic_bias_lock);
-static bool wm8994_mic_bias;
+static bool wm8994_mic_bias = false;
 static bool wm8994_submic_bias;
-bool jack_mic_bias;
+bool jack_mic_bias = false; 
 EXPORT_SYMBOL(jack_mic_bias);
 static void set_shared_mic_bias(void)
 {
