@@ -354,7 +354,8 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
 		   -fno-delete-null-pointer-checks \
-		   -Wno-unused-but-set-variable
+		   -Wno-unused-but-set-variable \
+		   -mtune=cortex-a8 -mfpu=neon -ftree-vectorize -mfloat-abi=softfp
 KBUILD_AFLAGS   := -D__ASSEMBLY__
 
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
