@@ -2390,23 +2390,25 @@ static void touch_keypad_onoff(int onoff)
 		msleep(25);
 }
 
-/*static void touch_keypad_gpio_sleep(int onoff){
+static void touch_keypad_gpio_sleep(int onoff)
+{
+#if !defined (CONFIG_S5PC110_DEMPSEY_BOARD) 
   if(onoff == TOUCHKEY_ON){
     /*
      * reconfigure gpio to activate touchkey controller vdd in sleep mode
      */
-  /*  s3c_gpio_slp_cfgpin(_3_GPIO_TOUCH_EN, S3C_GPIO_SLP_OUT1);
+  s3c_gpio_slp_cfgpin(_3_GPIO_TOUCH_EN, S3C_GPIO_SLP_OUT1);
     //s3c_gpio_slp_setpull_updown(_3_GPIO_TOUCH_EN, S3C_GPIO_PULL_NONE);
   } else {
     /*
      * reconfigure gpio to deactivate touchkey vdd in sleep mode,
      * this is the default
      */
-  /*  s3c_gpio_slp_cfgpin(_3_GPIO_TOUCH_EN, S3C_GPIO_SLP_OUT0);
+  s3c_gpio_slp_cfgpin(_3_GPIO_TOUCH_EN, S3C_GPIO_SLP_OUT0);
     //s3c_gpio_slp_setpull_updown(_3_GPIO_TOUCH_EN, S3C_GPIO_PULL_NONE);
   }
-
-} */
+#endif
+} 
 
 #if defined (CONFIG_S5PC110_KEPLER_BOARD)
 static const int touch_keypad_code[] = {
@@ -2464,6 +2466,7 @@ static struct touchkey_platform_data touchkey_data = {
 	.keycode_cnt = ARRAY_SIZE(touch_keypad_code),
 	.keycode = touch_keypad_code,
 	.touchkey_onoff = touch_keypad_onoff,
+	.touchkey_sleep_onoff = touch_keypad_gpio_sleep, 
 };
 
 static struct gpio_event_direct_entry aries_keypad_key_map[] = {
