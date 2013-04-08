@@ -75,7 +75,7 @@ static int __init aries_init_touchkey_led(void)
 	u32 gpio;
 #endif
 
-	if (!machine_is_aries() || !aries_is_tft_dev())
+	if (!machine_is_aries() || system_rev < 0x10)
 		return 0;
 
 	for (i = 0; i < ARRAY_SIZE(led_gpios); i++) {
