@@ -103,7 +103,7 @@ static int i2c_touchkey_read_byte(struct cypress_touchkey_devdata *devdata,
 					u8 *val)
 {
 	int ret;
-	int retry = 2;
+	int retry = 5;
 
 	while (true) {
 		ret = i2c_smbus_read_byte(devdata->client);
@@ -291,10 +291,6 @@ static void cypress_touchkey_early_suspend(struct early_suspend *h)
 #endif 
 
 	all_keys_up(devdata);
-       #if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
-	touchkey_ldo_on(0);
-       #endif
-
 }
 
 static void cypress_touchkey_early_resume(struct early_suspend *h)
@@ -758,11 +754,6 @@ static int cypress_touchkey_probe(struct i2c_client *client,
 
 	devdata->is_powering_on = false;
 
-#ifdef CONFIG_GENERIC_BLN
-  blndevdata = devdata;
-  register_bln_implementation(&cypress_touchkey_bln);
-#endif 
-
 #if defined(TOUCH_UPDATE)
 	ret = misc_register(&touchkey_update_device);
 	if (ret) {
@@ -843,6 +834,11 @@ static int cypress_touchkey_probe(struct i2c_client *client,
 #endif
 
 #endif
+
+#ifdef CONFIG_GENERIC_BLN
+  blndevdata = devdata;
+  register_bln_implementation(&cypress_touchkey_bln);
+#endif 
 
 	return 0;
 
