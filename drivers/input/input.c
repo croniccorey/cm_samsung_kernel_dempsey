@@ -27,10 +27,6 @@
 #include <linux/smp_lock.h>
 #include "input-compat.h"
 
-#ifdef CONFIG_TOUCH_WAKE
-#include <linux/touch_wake.h>
-#endif 
-
 #ifdef CONFIG_KERNEL_DEBUG_SEC
 #include <linux/kernel_sec_common.h>
 #endif
@@ -218,17 +214,6 @@ static void input_handle_event(struct input_dev *dev,
 	case EV_KEY:
 		if (is_event_supported(code, dev->keybit, KEY_MAX) &&
 		    !!test_bit(code, dev->key) != value) {
-
-#ifdef CONFIG_TOUCH_WAKE
-      if (code == KEY_POWER && !device_is_suspended()) {
-        if (value == 1) {
-          powerkey_pressed();
-        }
-        else if (value == 0) {
-          powerkey_released();
-        }
-      }
-#endif 
 
 			if (value != 2) {
 				__change_bit(code, dev->key);
