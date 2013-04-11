@@ -36,6 +36,10 @@
 
 #include <asm/unaligned.h>
 
+#ifdef CONFIG_TOUCH_WAKE
+#include <linux/touch_wake.h>
+#endif 
+
 #if defined(CONFIG_REGULATOR_MAX8998)
 #include <linux/regulator/consumer.h>
 #endif
@@ -44,10 +48,6 @@
 #ifdef CONFIG_TOUCHSCREEN_MXT768E
 #include "mxt768e.h"
 #endif
-
-#ifdef CONFIG_TOUCH_WAKE
-#include <linux/touch_wake.h>
-#endif 
 
 #define OBJECT_TABLE_START_ADDRESS	7
 #define OBJECT_TABLE_ELEMENT_SIZE	6
@@ -1044,10 +1044,6 @@ static void report_input_data(struct mxt224_data *data)
 		#endif
 
 		input_mt_sync(data->input_dev);
-#ifdef CONFIG_TOUCH_WAKE
-  }
-  touch_press();
-#endif
 
 		if (g_debug_switch)
 			printk(KERN_ERR "[TSP] ID-%d, %4d,%4d\n", i, data->fingers[i].x, data->fingers[i].y);
@@ -1055,22 +1051,13 @@ static void report_input_data(struct mxt224_data *data)
 		if (touch_is_pressed_arr[i]!=0)
 			touch_is_pressed = 1;
 
-#if 0 //defined(CONFIG_TARGET_LOCALE_NAATT) || defined(CONFIG_S5PC110_DEMPSEY_BOARD)
-		if (touch_is_pressed_arr[i]==0)
-			printk(KERN_ERR "[TSP] Up[%d] %4d,%4d\n", i, data->fingers[i].x, data->fingers[i].y);
-		else if (touch_is_pressed_arr[i]==1)
-		{
-			printk(KERN_ERR "[TSP] Dn[%d] %4d,%4d\n", i, data->fingers[i].x, data->fingers[i].y);
-			presscount++;
-		}
-		else if (touch_is_pressed_arr[i]==2)
-			movecount++;
-
-#endif
-
-
 		if (data->fingers[i].z == 0)
 			data->fingers[i].z = -1;
+
+#ifdef CONFIG_TOUCH_WAKE
+  }
+  touch_press();
+#endif 
 	}
 	data->finger_mask = 0;
 	touch_state = 0;
@@ -1500,7 +1487,7 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 				#endif
 
 			} else if ((msg[1] & SUPPRESS_MSG_MASK) && 
-
+	
 				(data->fingers[id].z != -1)) { 
 				data->fingers[id].z = 0;
 				data->fingers[id].w = msg[5];
@@ -1627,7 +1614,7 @@ static void mxt224_early_suspend(struct early_suspend *h)
 	disable_irq(data->client->irq);
 	mxt224_internal_suspend(data);
 #endif
-#endif 
+#endif
 }
 
 static void mxt224_late_resume(struct early_suspend *h)
@@ -1655,7 +1642,7 @@ static void mxt224_late_resume(struct early_suspend *h)
 	noise_freq_table.fherr_count = 0;
 
 	enable_irq(data->client->irq);
-#endif
+
 
 #ifdef CONFIG_TARGET_LOCALE_KOR
 	is_inputmethod = 0;
@@ -1665,6 +1652,7 @@ static void mxt224_late_resume(struct early_suspend *h)
 
 	calibrate_chip();
 #endif /* CONFIG_MACH_C1_NA_SPR_EPIC2_REV00 */
+#endif
 }
 
 #ifdef CONFIG_TOUCH_WAKE
