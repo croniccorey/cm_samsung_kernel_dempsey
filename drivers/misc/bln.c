@@ -18,12 +18,12 @@
 #include <linux/timer.h>
 #include <linux/wakelock.h>
 
-static bool bln_enabled = true; /* is BLN function is enabled */
+static bool bln_enabled = false; /* is BLN function is enabled */
 static bool bln_ongoing = false; /* ongoing LED Notification */
 static int bln_blink_state = 0;
 static bool bln_suspended = false; /* is system suspended */
 static struct bln_implementation *bln_imp = NULL;
-static bool in_kernel_blink = false;
+static bool in_kernel_blink = true;
 static uint32_t blink_count;
 
 static struct wake_lock bln_wake_lock;
@@ -34,8 +34,8 @@ static struct timer_list blink_timer =
 static void blink_callback(struct work_struct *blink_work);
 static DECLARE_WORK(blink_work, blink_callback);
 
-static uint32_t blink_interval = 750;	/* on / off every 750ms */
-static uint32_t max_blink_count = 600;  /* 10 minutes */
+static uint32_t blink_interval = 1000;	/* on / off every 1000ms */
+static uint32_t max_blink_count = 1200;  /* 20 minutes */
 
 #define BACKLIGHTNOTIFICATION_VERSION 9
 

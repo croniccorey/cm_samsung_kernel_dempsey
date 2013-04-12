@@ -648,6 +648,10 @@ static void cypress_touchkey_disable_led_notification(void){
      */
     blndevdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
 
+#if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
+	touchkey_ldo_on(0);
+#endif
+
   }
 #ifdef CONFIG_TOUCH_WAKE
   else
