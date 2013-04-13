@@ -5508,8 +5508,8 @@ static s32 wl_setup_wiphy(struct wireless_dev *wdev, struct device *sdiofunc_dev
 	wdev->wiphy->max_scan_ssids = WL_SCAN_PARAMS_SSID_MAX;
 	wdev->wiphy->max_num_pmkids = WL_NUM_PMKIDS_MAX;
 	wdev->wiphy->interface_modes =
-		BIT(NL80211_IFTYPE_STATION)
-	    | BIT(NL80211_IFTYPE_AP) | BIT(NL80211_IFTYPE_MONITOR);
+    	    BIT(NL80211_IFTYPE_STATION) | BIT(NL80211_IFTYPE_ADHOC)
+     	   | BIT(NL80211_IFTYPE_AP) | BIT(NL80211_IFTYPE_MONITOR); 
 
 	wdev->wiphy->bands[IEEE80211_BAND_2GHZ] = &__wl_band_2ghz;
 	wdev->wiphy->bands[IEEE80211_BAND_5GHZ] = &__wl_band_5ghz_a;
