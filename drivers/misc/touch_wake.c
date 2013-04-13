@@ -28,10 +28,8 @@ static bool touch_disabled = false;
 static bool device_suspended = false;
 
 static bool timed_out = true;
-
+static bool prox_near = false;
 static unsigned int touchoff_delay = 45000;
-
-static const unsigned int presspower_delay = 100;
 
 static void touchwake_touchoff(struct work_struct * touchoff_work);
 
@@ -52,6 +50,10 @@ static struct timeval last_powerkeypress;
 #define TOUCHWAKE_VERSION 1
 
 #define TIME_LONGPRESS 500
+
+#define POWERPRESS_DELAY 100
+
+#define POWERPRESS_TIMEOUT 1000 
 
 static void touchwake_disable_touch(void)
 {
@@ -128,7 +130,7 @@ static void touchwake_late_resume(struct early_suspend * h)
 
 static struct early_suspend touchwake_suspend_data = 
     {
-	.level = EARLY_SUSPEND_LEVEL_DISABLE_FB * 10,
+	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN, 
 	.suspend = touchwake_early_suspend,
 	.resume = touchwake_late_resume,
     };
@@ -146,11 +148,13 @@ static void press_powerkey(struct work_struct * presspower_work)
 {
     input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
     input_event(powerkey_device, EV_SYN, 0, 0);
-    msleep(presspower_delay);
+    msleep(POWERPRESS_DELAY); 
 
     input_event(powerkey_device, EV_KEY, KEY_POWER, 0);
     input_event(powerkey_device, EV_SYN, 0, 0);
-    msleep(presspower_delay);
+    msleep(POWERPRESS_DELAY);
+
+    msleep(POWERPRESS_TIMEOUT); 
 
     mutex_unlock(&lock);
 
@@ -247,12 +251,21 @@ static struct miscdevice touchwake_device =
     };
 
 void proximity_detected(void)
-{   
-    timed_out = false;
+{
+  timed_out = false;
+  prox_near = true;
+  return; 
+}
+EXPORT_SYMBOL(proximity_detected);
+
+void proximity_off(void)
+{
+  timed_out = true;
+  prox_near = false; 
 
     return;
 }
-EXPORT_SYMBOL(proximity_detected);
+EXPORT_SYMBOL(proximity_off); 
 
 void powerkey_pressed(void)
 {   
@@ -283,11 +296,9 @@ void powerkey_released(void)
 EXPORT_SYMBOL(powerkey_released);
 
 void touch_press(void)
-{   
-    if (device_suspended && touchwake_enabled && mutex_trylock(&lock))
-	{
-	    schedule_work(&presspower_work);
-	}
+{
+  if (device_suspended && touchwake_enabled && !prox_near && mutex_trylock(&lock))
+    schedule_work(&presspower_work); 
 
     return;
 }
