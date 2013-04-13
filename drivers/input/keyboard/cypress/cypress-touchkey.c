@@ -641,17 +641,15 @@ static void cypress_touchkey_disable_led_notification(void){
   if (blndevdata->is_powering_on){
     disable_touchkey_backlights();
 
+    #if 0
     /*
      * power off the touchkey controller
      * This is actually not needed, the early_suspend function
      * should take care of powering off the touchkey controller
      */
     blndevdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
-
-#if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
-	touchkey_ldo_on(0);
-#endif
-
+    touchkey_ldo_on(0);
+    #endif
   }
 #ifdef CONFIG_TOUCH_WAKE
   else
@@ -888,6 +886,12 @@ static int __devexit i2c_touchkey_remove(struct i2c_client *client)
 	free_irq(client->irq, devdata);
 	all_keys_up(devdata);
 	input_unregister_device(devdata->input_dev);
+
+#ifdef CONFIG_GENERIC_BLN
+        misc_deregister(&cypress_touchkey_bln);
+#endif 
+	if (touchkey_wq)
+	destroy_workqueue(touchkey_wq);
  	
 	#if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 	touchkey_ldo_on(0);
