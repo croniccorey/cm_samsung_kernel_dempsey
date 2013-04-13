@@ -29,7 +29,7 @@ static bool device_suspended = false;
 
 static bool timed_out = true;
 static bool prox_near = false;
-static unsigned int touchoff_delay = 45000;
+static unsigned int touchoff_delay = 0;
 
 static void touchwake_touchoff(struct work_struct * touchoff_work);
 
