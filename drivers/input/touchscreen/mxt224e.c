@@ -36,6 +36,10 @@
 
 #include <asm/unaligned.h>
 
+#ifdef CONFIG_TOUCH_WAKE
+#include <linux/touch_wake.h>
+#endif 
+
 #if defined(CONFIG_REGULATOR_MAX8998)
 #include <linux/regulator/consumer.h>
 #endif
@@ -1024,6 +1028,10 @@ static void report_input_data(struct mxt224_data *data)
 		if (data->fingers[i].z == -1)
 			continue;
 
+#ifdef CONFIG_TOUCH_WAKE
+  if (!device_is_suspended())
+  {
+#endif 
 		input_report_abs(data->input_dev, ABS_MT_POSITION_X, data->fingers[i].x);
 		input_report_abs(data->input_dev, ABS_MT_POSITION_Y, data->fingers[i].y);
 		input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, data->fingers[i].z);
@@ -1043,22 +1051,13 @@ static void report_input_data(struct mxt224_data *data)
 		if (touch_is_pressed_arr[i]!=0)
 			touch_is_pressed = 1;
 
-#if 0 //defined(CONFIG_TARGET_LOCALE_NAATT) || defined(CONFIG_S5PC110_DEMPSEY_BOARD)
-		if (touch_is_pressed_arr[i]==0)
-			printk(KERN_ERR "[TSP] Up[%d] %4d,%4d\n", i, data->fingers[i].x, data->fingers[i].y);
-		else if (touch_is_pressed_arr[i]==1)
-		{
-			printk(KERN_ERR "[TSP] Dn[%d] %4d,%4d\n", i, data->fingers[i].x, data->fingers[i].y);
-			presscount++;
-		}
-		else if (touch_is_pressed_arr[i]==2)
-			movecount++;
-
-#endif
-
-
 		if (data->fingers[i].z == 0)
 			data->fingers[i].z = -1;
+
+#ifdef CONFIG_TOUCH_WAKE
+  }
+  touch_press();
+#endif 
 	}
 	data->finger_mask = 0;
 	touch_state = 0;
@@ -1487,7 +1486,9 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 					data->fingers[id].component = msg[7];
 				#endif
 
-			} else if ((msg[1] & SUPPRESS_MSG_MASK) && (data->fingers[id].z != -1)) {
+			} else if ((msg[1] & SUPPRESS_MSG_MASK) && 
+	
+				(data->fingers[id].z != -1)) { 
 				data->fingers[id].z = 0;
 				data->fingers[id].w = msg[5];
 				data->finger_mask |= 1U << id;
@@ -1582,6 +1583,7 @@ static int mxt224_internal_resume(struct mxt224_data *data)
 
 static void mxt224_early_suspend(struct early_suspend *h)
 {
+#ifndef CONFIG_TOUCH_WAKE 
 	struct mxt224_data *data = container_of(h, struct mxt224_data,
 								early_suspend);
 
@@ -1612,10 +1614,12 @@ static void mxt224_early_suspend(struct early_suspend *h)
 	disable_irq(data->client->irq);
 	mxt224_internal_suspend(data);
 #endif
+#endif
 }
 
 static void mxt224_late_resume(struct early_suspend *h)
 {
+#ifndef CONFIG_TOUCH_WAKE 
 	struct mxt224_data *data = container_of(h, struct mxt224_data,
 								early_suspend);
 	bool ta_status = 0;
@@ -1648,7 +1652,30 @@ static void mxt224_late_resume(struct early_suspend *h)
 
 	calibrate_chip();
 #endif /* CONFIG_MACH_C1_NA_SPR_EPIC2_REV00 */
+#endif
 }
+
+#ifdef CONFIG_TOUCH_WAKE
+static struct mxt224_data * touchwake_data;
+
+void touchscreen_disable(void)
+{
+    disable_irq(touchwake_data->client->irq);
+    mxt224_internal_suspend(touchwake_data);
+
+    return;
+}
+EXPORT_SYMBOL(touchscreen_disable);
+
+void touchscreen_enable(void)
+{
+    mxt224_internal_resume(touchwake_data);
+    enable_irq(touchwake_data->client->irq);
+
+    return;
+}
+EXPORT_SYMBOL(touchscreen_enable);
+#endif 
 #else
 static int mxt224_suspend(struct device *dev)
 {
@@ -3165,7 +3192,11 @@ if (device_create_file(sec_touchscreen, &dev_attr_mxt_touchtype) < 0)
 	register_early_suspend(&data->early_suspend);
 #endif
 
-	return 0;
+#ifdef CONFIG_TOUCH_WAKE
+  touchwake_data = data;
+#endif  
+  
+  return 0;   
 
 err_irq:
 err_reset:
