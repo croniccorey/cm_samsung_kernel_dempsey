@@ -285,15 +285,13 @@ static void cypress_touchkey_early_suspend(struct early_suspend *h)
   if(!bln_is_ongoing()) {
     devdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
     devdata->pdata->touchkey_sleep_onoff(TOUCHKEY_OFF);
+    #if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
+		touchkey_ldo_on(0);
+    #endif
   }
 #else 
 	devdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
 #endif 
-
-    #if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
-		touchkey_ldo_on(0);
-    #endif
-
 	all_keys_up(devdata);
 }
 
