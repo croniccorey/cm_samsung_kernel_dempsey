@@ -42,6 +42,7 @@ obj-$(CONFIG_MACH_ARIES)	+= aries-btlpm.o
 obj-$(CONFIG_MACH_ARIES)	+= aries-watchdog.o
 obj-$(CONFIG_MACH_ARIES)	+= aries-panel.o
 obj-$(CONFIG_MACH_ARIES)        += sec_switch.o
+obj-$(CONFIG_MACH_ARIES)        += aries-touchkey-led.o
 
 obj-$(CONFIG_MACH_ARIES)	+= dev-s1-phone.o
 

@@ -648,8 +648,8 @@ static void cypress_touchkey_disable_led_notification(void){
      * should take care of powering off the touchkey controller
      */
     blndevdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
-    touchkey_ldo_on(0);
     #endif
+    touchkey_ldo_on(0);
   }
 #ifdef CONFIG_TOUCH_WAKE
   else
