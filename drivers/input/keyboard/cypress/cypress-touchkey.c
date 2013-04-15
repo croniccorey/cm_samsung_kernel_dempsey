@@ -639,14 +639,15 @@ static void cypress_touchkey_disable_led_notification(void){
   /* if touchkeys lights are not used for touchmode */
   if (blndevdata->is_powering_on){
     disable_touchkey_backlights();
-
+  #if 0
     /*
      * power off the touchkey controller
      * This is actually not needed, the early_suspend function
      * should take care of powering off the touchkey controller
      */
-  //  blndevdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
-    touchkey_ldo_on(0);
+    blndevdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
+  #endif  
+  touchkey_ldo_on(0);
   }
 #ifdef CONFIG_TOUCH_WAKE
   else
