@@ -49,4 +49,5 @@ obj-$(CONFIG_VIBETONZ)		+= vibetonz/
 obj-$(CONFIG_LEVEL)			+= level/
 obj-$(CONFIG_TOUCH_WAKE)  	+= touch_wake.o
 obj-$(CONFIG_GENERIC_BLN)  	+= bln.o
+obj-$(CONFIG_BLD)    		+= bld.o 
 
