@@ -49,6 +49,10 @@
 #include <linux/usb/gadget.h>
 #include <linux/hrtimer.h>
 
+#ifdef CONFIG_BLX
+#include <linux/blx.h>
+#endif 
+
 #if (defined CONFIG_S5PC110_DEMPSEY_BOARD)
 extern unsigned int HWREV;
 #endif
@@ -1203,6 +1207,14 @@ static void s3c_bat_discharge_reason(struct chg_data *chg)
 //		chg->bat_info.dis_reason |= DISCONNECT_BAT_FULL;
 
 
+#ifdef CONFIG_BLX
+  if (get_charginglimit() != MAX_CHARGINGLIMIT && chg->bat_info.batt_soc >= get_charginglimit())
+      {
+    chg->bat_info.dis_reason |= DISCONNECT_BAT_FULL;
+
+    chg->bat_info.batt_is_full = true;
+      }
+#endif 
 
 	ktime = alarm_get_elapsed_realtime();
 	cur_time = ktime_to_timespec(ktime);
