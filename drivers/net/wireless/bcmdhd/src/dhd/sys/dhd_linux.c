@@ -605,6 +605,11 @@ static void dhd_set_packet_filter(int value, dhd_pub_t *dhd)
 }
 
 #if defined(CONFIG_HAS_EARLYSUSPEND)
+#ifdef CONFIG_BCMDHD_WIFI_PM
+static int wifi_pm = 0;
+/* /sys/module/bcmdhd/parameters/wifi_pm */
+module_param(wifi_pm, int, 0644);
+#endif
 static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 {
 	char iovbuf[32];
@@ -618,6 +623,11 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 
 	DHD_ERROR(("%s: enter, value = %d in_suspend=%d\n",
 		__FUNCTION__, value, dhd->in_suspend));
+
+#ifdef CONFIG_BCMDHD_WIFI_PM
+  if (wifi_pm == 1)
+      power_mode = PM_FAST;
+#endif
 
 	if (dhd && dhd->up) {
 		if (value && dhd->in_suspend) {
