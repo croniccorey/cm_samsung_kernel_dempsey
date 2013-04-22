@@ -274,10 +274,15 @@ static void udc_reinit(struct s3c_udc *dev)
  */
 static int udc_enable(struct s3c_udc *dev)
 {
+	unsigned long flags;
+
 	DEBUG_SETUP("%s: %p\n", __func__, dev);
 
 	otg_phy_init();
+	
+	spin_lock_irqsave(&dev->lock, flags);
 	reconfig_usbd();
+	spin_unlock_irqrestore(&dev->lock, flags);
 
 	DEBUG_SETUP("S3C USB 2.0 OTG Controller Core Initialized : 0x%x\n",
 			readl(S3C_UDC_OTG_GINTMSK));
@@ -568,6 +573,7 @@ static void stop_activity(struct s3c_udc *dev,
 
 static void reconfig_usbd(void)
 {
+struct s3c_udc *dev = the_controller;
 	/* 2. Soft-reset OTG Core and then unreset again. */
 #ifdef DED_TX_FIFO
 	int i;
@@ -594,9 +600,11 @@ static void reconfig_usbd(void)
 	udelay(20);
 
 	/* 4. Make the OTG device core exit from the disconnected state.*/
-	uTemp = readl(S3C_UDC_OTG_DCTL);
-	uTemp = uTemp & ~SOFT_DISCONNECT;
-	writel(uTemp, S3C_UDC_OTG_DCTL);
+	if (!dev->soft_disconnected) {
+		uTemp = readl(S3C_UDC_OTG_DCTL);
+		uTemp = uTemp & ~SOFT_DISCONNECT;
+		writel(uTemp, S3C_UDC_OTG_DCTL);
+  	}
 
 	/* 5. Configure OTG Core to initial settings of device mode.*/
 	/* [][1: full speed(30Mhz) 0:high speed]*/
@@ -930,16 +938,25 @@ wakeup_exit:
 
 void s3c_udc_soft_connect(void)
 {
+	struct s3c_udc *dev = the_controller;
+	unsigned long flags;
 	u32 uTemp;
+
 	DEBUG("[%s]\n", __func__);
+
+	spin_lock_irqsave(&dev->lock, flags);
+
 	uTemp = readl(S3C_UDC_OTG_DCTL);
 	uTemp = uTemp & ~SOFT_DISCONNECT;
 	writel(uTemp, S3C_UDC_OTG_DCTL);
-	msleep(1);
+	udelay(20);
 
 	/* Unmask the core interrupt */
 	writel(readl(S3C_UDC_OTG_GINTSTS), S3C_UDC_OTG_GINTSTS);
 	writel(GINTMSK_INIT, S3C_UDC_OTG_GINTMSK);
+
+	dev->soft_disconnected = 0;
+  	spin_unlock_irqrestore(&dev->lock, flags);
 }
 
 void s3c_udc_soft_disconnect(void)
@@ -950,6 +967,8 @@ void s3c_udc_soft_disconnect(void)
 
 	DEBUG("[%s]\n", __func__);
 
+	spin_lock_irqsave(&dev->lock, flags);
+
 	/* Mask the core interrupt */
 	writel(0, S3C_UDC_OTG_GINTMSK);
 
@@ -957,10 +976,10 @@ void s3c_udc_soft_disconnect(void)
 	uTemp |= SOFT_DISCONNECT;
 	writel(uTemp, S3C_UDC_OTG_DCTL);
 
-	spin_lock_irqsave(&dev->lock, flags);
 	stop_activity(dev, dev->driver);
-	spin_unlock_irqrestore(&dev->lock, flags);
 
+	dev->soft_disconnected = 1;
+	spin_unlock_irqrestore(&dev->lock, flags);
 }
 
 static int s3c_udc_pullup(struct usb_gadget *gadget, int is_on)
