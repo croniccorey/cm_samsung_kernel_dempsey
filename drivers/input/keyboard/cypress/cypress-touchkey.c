@@ -312,18 +312,15 @@ static void cypress_touchkey_early_suspend(struct early_suspend *h)
    * while a led notification is ongoing
    */
   if(!bln_is_ongoing()) {
-    devdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
-    devdata->pdata->touchkey_sleep_onoff(TOUCHKEY_OFF);
-  }
-#else 
-	devdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
 #endif 
-
+	devdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
+#ifdef CONFIG_GENERIC_BLN
+  }
+#endif 
+	all_keys_up(devdata);
     #if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 		touchkey_ldo_on(0);
     #endif
-
-	all_keys_up(devdata);
 }
 
 static void cypress_touchkey_early_resume(struct early_suspend *h)
@@ -641,9 +638,9 @@ static void cypress_touchkey_enable_led_notification(void){
      * did not power on the touchkey controller for some reasons
      */
 
-	touchkey_ldo_on(1);
-
 //    blndevdata->pdata->touchkey_onoff(TOUCHKEY_ON);
+
+	touchkey_ldo_on(1);
 
     /* write to i2cbus, enable backlights */
     enable_touchkey_backlights();
@@ -674,7 +671,8 @@ static void cypress_touchkey_disable_led_notification(void){
      * This is actually not needed, the early_suspend function
      * should take care of powering off the touchkey controller
      */
-  //  blndevdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
+//    blndevdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
+
     touchkey_ldo_on(0);
   }
 #ifdef CONFIG_TOUCH_WAKE
