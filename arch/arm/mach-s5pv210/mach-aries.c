@@ -7947,8 +7947,8 @@ void otg_phy_init(void)
 /*	writel((readl(S3C_USBOTG_PHYTUNE) & ~(0xf)) | (0x1<<2) | (0x1<<1),
 			S3C_USBOTG_PHYTUNE);         eye-diagram tuning      */
 	
-	/* set DC level as 0xf (24%) */
-  writel(readl(S3C_USBOTG_PHYTUNE) | 0xf, S3C_USBOTG_PHYTUNE);
+	writel((readl(S3C_USBOTG_PHYTUNE) & ~(0xf)) | (0xf),
+			S3C_USBOTG_PHYTUNE);
 	
 }
 EXPORT_SYMBOL(otg_phy_init);
