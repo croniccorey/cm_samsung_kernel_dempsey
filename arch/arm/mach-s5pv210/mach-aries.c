@@ -5937,8 +5937,10 @@ static void fsa9480_usb_cb(bool attached)
 	if (gadget) {
 		if (attached)
 			usb_gadget_vbus_connect(gadget);
-		else
+		else {
+			gadget->speed = USB_SPEED_HIGH;
 			usb_gadget_vbus_disconnect(gadget);
+		}
 	}
 
 	mtp_off_status = false;
