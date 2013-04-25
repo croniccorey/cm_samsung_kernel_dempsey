@@ -9,11 +9,6 @@ busybox rm init
 busybox mount -t proc proc /proc
 busybox mount -t sysfs sysfs /sys
 
-while ! busybox test -d /sys/dev/block/179:0 ; do
-	echo "Waiting for internal mmc..."
-	busybox sleep 1
-done
-
 busybox mount -t yaffs2 /dev/block/mtdblock2 /system
 busybox mount -t yaffs2 /dev/block/mtdblock3 /cache
 
