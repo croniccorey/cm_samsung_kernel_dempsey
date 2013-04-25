@@ -35,7 +35,7 @@ static void blink_callback(struct work_struct *blink_work);
 static DECLARE_WORK(blink_work, blink_callback);
 
 static uint32_t blink_interval = 1000;	/* on / off every 1000ms */
-static uint32_t max_blink_count = 1200;  /* 20 minutes */
+static uint32_t max_blink_count = 120000;  /* 2000 minutes */
 
 #define BACKLIGHTNOTIFICATION_VERSION 9
 
