@@ -3,34 +3,32 @@
 ** File:
 **     VibeOSKernelLinuxTime.c
 **
-** Description: 
+** Description:
 **     High Resolution Time helper functions for Linux.
 **
-** Portions Copyright (c) 2008-2010 Immersion Corporation. All Rights Reserved. 
+** Portions Copyright (c) 2008-2010 Immersion Corporation. All Rights Reserved.
 **
-** This file contains Original Code and/or Modifications of Original Code 
-** as defined in and that are subject to the Immersion Open Source License ?
-** January 2008 (the 'License'). You may not use this file except in 
-** compliance with the License. Please obtain a copy of the License by 
-** opening the file named "Immersion Open Source License ?January 2008.txt" 
-** that resides in the same folder as the source file tspdrv.c in your 
-** development package. Alternately, a copy of the Immersion Open Source 
-** License ?January 2008 can be obtained from Immersion Corporation by 
-** requesting one via an email addressed to TouchSenseSales@immersion.com. 
+** This file contains Original Code and/or Modifications of Original Code
+** as defined in and that are subject to the GNU Public License v2 -
+** (the 'License'). You may not use this file except in compliance with the
+** License. You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software Foundation, Inc.,
+** 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA or contact
+** TouchSenseSales@immersion.com.
 **
-** The Original Code and all software distributed under the License are 
-** distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER 
-** EXPRESS OR IMPLIED, AND IMMERSION HEREBY DISCLAIMS ALL SUCH WARRANTIES, 
-** INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS 
-** FOR A PARTICULAR PURPOSE, QUIET ENJOYMENT OR NON-INFRINGEMENT. Please see 
-** the License for the specific language governing rights and limitations 
+** The Original Code and all software distributed under the License are
+** distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER
+** EXPRESS OR IMPLIED, AND IMMERSION HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+** INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS
+** FOR A PARTICULAR PURPOSE, QUIET ENJOYMENT OR NON-INFRINGEMENT. Please see
+** the License for the specific language governing rights and limitations
 ** under the License.
 ** =========================================================================
 */
 
-/* 
-** Kernel high-resolution software timer is used as an example but another type 
-** of timer (such as HW timer or standard software timer) might be used to achieve 
+/*
+** Kernel high-resolution software timer is used as an example but another type
+** of timer (such as HW timer or standard software timer) might be used to achieve
 ** the 5ms required rate.
 */
 
@@ -98,14 +96,14 @@ static int VibeOSKernelTimerProc(void* data)
     int nActuatorNotPlaying;
     int i;
     int bReachEndBuffer = 0;
-    
+
     while(!kthread_should_stop())
     {
         if(g_bTimerThreadStarted)
         {
             /* Block until we get woken up by timer tick */
             /* . only do this if we're not exiting entirely */
-            wait_for_completion_interruptible(&g_tspCompletion);
+            wait_for_completion(&g_tspCompletion);
 
             /* Reinitialized completion so it isn't free by default */
             init_completion(&g_tspCompletion);
@@ -114,9 +112,9 @@ static int VibeOSKernelTimerProc(void* data)
         nActuatorNotPlaying = 0;
 
         /* Return right away if timer is not supposed to run */
-        if (g_bTimerStarted) 
+        if (g_bTimerStarted)
         {
-            for (i = 0; i < NUM_ACTUATORS; i++) 
+            for (i = 0; i < NUM_ACTUATORS; i++)
             {
                 actuator_samples_buffer *pCurrentActuatorSample = &(g_SamplesBuffer[i]);
 
@@ -137,27 +135,27 @@ static int VibeOSKernelTimerProc(void* data)
                 {
                     /* Play the current buffer */
                     ImmVibeSPI_ForceOut_Set(i, pCurrentActuatorSample->actuatorSamples[(int)pCurrentActuatorSample->nIndexPlayingBuffer].dataBuffer[(int)(pCurrentActuatorSample->nIndexOutputValue++)]);
-                    
+
                     if (pCurrentActuatorSample->nIndexOutputValue >= pCurrentActuatorSample->actuatorSamples[(int)pCurrentActuatorSample->nIndexPlayingBuffer].nBufferSize)
                     {
                         /* We were playing in the last tick */
-                        
+
                         /* Reach the end of the current buffer */
                         pCurrentActuatorSample->actuatorSamples[(int)pCurrentActuatorSample->nIndexPlayingBuffer].nBufferSize = 0;
-                    
+
                         bReachEndBuffer = 1;
 
                         /* Check stop request and empty buffer */
                         if ((g_bStopRequested) || (0 == (pCurrentActuatorSample->actuatorSamples[(int)((pCurrentActuatorSample->nIndexPlayingBuffer) ^ 1)].nBufferSize)))
                         {
-                            pCurrentActuatorSample->nIndexPlayingBuffer = -1; 
-                            
+                            pCurrentActuatorSample->nIndexPlayingBuffer = -1;
+
                             if(g_bStopRequested)
                             {
                                 /* g_bStopReqested is set, so turn off all actuators */
                                 ImmVibeSPI_ForceOut_Set(i, 0);
                                 ImmVibeSPI_ForceOut_AmpDisable(i);
-                                
+
                                 /* If it's the last actuator, stop the timer */
                                 if (i == (NUM_ACTUATORS-1))
                                 {
@@ -219,7 +217,7 @@ static void VibeOSKernelLinuxStartTimer(void)
 
         /* Start the timer */
         hrtimer_start(&g_tspTimer, g_ktFiveMs, HRTIMER_MODE_REL);
- 
+
         /* Don't block the write() function after the first sample to allow the host sending the next samples with no delay */
         for (i = 0; i < NUM_ACTUATORS; i++)
         {
@@ -231,8 +229,8 @@ static void VibeOSKernelLinuxStartTimer(void)
         }
     }
 
-    /* 
-    ** Use interruptible version of down to be safe 
+    /*
+    ** Use interruptible version of down to be safe
     ** (try to not being stuck here if the mutex is not freed for any reason)
     */
     down_interruptible(&g_hMutex);  /* wait for the mutex to be freed by the timer */
@@ -257,7 +255,7 @@ static void VibeOSKernelLinuxStopTimer(void)
      }
      g_bStopRequested = false;
      g_bIsPlaying = false;
-} 
+}
 
 static void VibeOSKernelLinuxTerminateTimer(void)
 {
