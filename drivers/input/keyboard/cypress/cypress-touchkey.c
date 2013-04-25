@@ -111,7 +111,7 @@ static int i2c_touchkey_read_byte(struct cypress_touchkey_devdata *devdata,
 					u8 *val)
 {
 	int ret;
-	int retry = 2;
+	int retry = 5;
 
 	while (true) {
 		ret = i2c_smbus_read_byte(devdata->client);
@@ -311,9 +311,12 @@ static void cypress_touchkey_early_suspend(struct early_suspend *h)
    * Disallow powering off the touchkey controller
    * while a led notification is ongoing
    */
-if(!bln_is_ongoing())
-#endif
+  if(!bln_is_ongoing()) {
+#endif 
 	devdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
+#ifdef CONFIG_GENERIC_BLN
+  }
+#endif 
 	all_keys_up(devdata);
     #if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 		touchkey_ldo_on(0);
@@ -901,7 +904,7 @@ err_create_wq:
 #endif
 err_misc_reg:
 err_req_irq:
-//err_backlight_on:
+err_backlight_on:
 err_read:
 	devdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
 	input_unregister_device(input_dev);
