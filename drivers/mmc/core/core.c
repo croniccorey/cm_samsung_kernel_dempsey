@@ -1241,7 +1241,7 @@ void mmc_rescan(struct work_struct *work)
 out:
 #if 0
 	//if (extend_wakelock)
-	//	wake_lock_timeout(&mmc_delayed_work_wake_lock, HZ / 4);
+	//	wake_lock_timeout(&mmc_delayed_work_wake_lock, HZ / 2);
 	//else
 	//	wake_unlock(&mmc_delayed_work_wake_lock);
 #else
