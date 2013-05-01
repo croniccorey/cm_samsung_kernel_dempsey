@@ -1121,8 +1121,6 @@ CONFIG_WLAN=y
 # CONFIG_ATH_COMMON is not set
 # CONFIG_BCM4334 is not set
 CONFIG_BCM4330=m
-CONFIG_BCMDHD_FW_PATH="/system/vendor/firmware/bcm4330_sta.bin"
-CONFIG_BCMDHD_NVRAM_PATH="/system/vendor/firmware/nvram_net.txt"
 # CONFIG_BCM43241 is not set
 CONFIG_BROADCOM_WIFI_RESERVED_MEM=y
 CONFIG_WLAN_COUNTRY_CODE=y
