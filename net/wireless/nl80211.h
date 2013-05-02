@@ -101,4 +101,7 @@ nl80211_send_cqm_pktloss_notify(struct cfg80211_registered_device *rdev,
 				struct net_device *netdev, const u8 *peer,
 				u32 num_packets, gfp_t gfp);
 
+bool nl80211_unexpected_frame(struct net_device *dev,
+            const u8 *addr, gfp_t gfp);
+
 #endif /* __NET_WIRELESS_NL80211_H */
