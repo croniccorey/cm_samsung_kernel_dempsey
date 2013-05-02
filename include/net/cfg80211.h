@@ -743,6 +743,15 @@ struct cfg80211_ssid {
 };
 
 /**
+ * struct cfg80211_match_set - sets of attributes to match
+ *
+ * @ssid: SSID to be matched
+ */
+struct cfg80211_match_set {
+  struct cfg80211_ssid ssid;
+};
+
+/**
  * struct cfg80211_scan_request - scan request description
  *
  * @ssids: SSIDs to scan for (active scan only)
@@ -761,6 +770,8 @@ struct cfg80211_scan_request {
 	u32 n_channels;
 	const u8 *ie;
 	size_t ie_len;
+	struct cfg80211_match_set *match_sets;
+  	int n_match_sets;
 
 	/* internal */
 	struct wiphy *wiphy;
@@ -1389,6 +1400,12 @@ struct cfg80211_ops {
 	int	(*set_antenna)(struct wiphy *wiphy, u32 tx_ant, u32 rx_ant);
 	int	(*get_antenna)(struct wiphy *wiphy, u32 *tx_ant, u32 *rx_ant);
 
+	int  (*tdls_mgmt)(struct wiphy *wiphy, struct net_device *dev,
+           			u8 *peer, u8 action_code,  u8 dialog_token,
+           			u16 status_code, const u8 *buf, size_t len);
+  	int  (*tdls_oper)(struct wiphy *wiphy, struct net_device *dev,
+        		 	u8 *peer, enum nl80211_tdls_operation oper);
+
 	int	(*set_ringparam)(struct wiphy *wiphy, u32 tx, u32 rx);
 	void	(*get_ringparam)(struct wiphy *wiphy,
 				 u32 *tx, u32 *tx_max, u32 *rx, u32 *rx_max);
@@ -1451,8 +1468,12 @@ enum wiphy_flags {
 	WIPHY_FLAG_CONTROL_PORT_PROTOCOL	= BIT(7),
 	WIPHY_FLAG_IBSS_RSN			= BIT(8),
 	WIPHY_FLAG_SUPPORTS_SEPARATE_DEFAULT_KEYS= BIT(9),
-	WIPHY_FLAG_HAVE_AP_SME      = BIT(10),
-	WIPHY_FLAG_REPORTS_OBSS      = BIT(11),
+	WIPHY_FLAG_HAVE_AP_SME      		= BIT(10),
+	WIPHY_FLAG_REPORTS_OBSS      		= BIT(11),
+	WIPHY_FLAG_SUPPORTS_FW_ROAM    		= BIT(12),
+  	WIPHY_FLAG_AP_UAPSD      		= BIT(13),
+  	WIPHY_FLAG_SUPPORTS_TDLS    		= BIT(14),
+  	WIPHY_FLAG_TDLS_EXTERNAL_SETUP    	= BIT(15),
 };
 
 struct mac_address {
@@ -1555,6 +1576,7 @@ struct wiphy {
 
 	int bss_priv_size;
 	u8 max_scan_ssids;
+	u8 max_match_sets;
 	u16 max_scan_ie_len;
 
 	int n_cipher_suites;
@@ -2805,6 +2827,17 @@ void cfg80211_probe_status(struct net_device *dev, const u8 *addr,
 void cfg80211_report_obss_beacon(struct wiphy *wiphy,
          const u8 *frame, size_t len,
          int freq, gfp_t gfp);
+
+/**
+ * cfg80211_pmksa_candidate_notify - notify about PMKSA caching candidate
+ * @dev: network device
+ * @index: candidate index (the smaller the index, the higher the priority)
+ * @bssid: BSSID of AP
+ * @preauth: Whether AP advertises support for RSN pre-authentication
+ * @gfp: allocation flags
+ */
+void cfg80211_pmksa_candidate_notify(struct net_device *dev, int index,
+             const u8 *bssid, bool preauth, gfp_t gfp);
 
 /* Logging, debugging and troubleshooting/diagnostic helpers. */
 
