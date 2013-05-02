@@ -877,6 +877,9 @@ void cfg80211_mlme_unregister_socket(struct wireless_dev *wdev, u32 nlpid)
 	}
 
 	spin_unlock_bh(&wdev->mgmt_registrations_lock);
+
+if (nlpid == wdev->ap_unexpected_nlpid)
+    wdev->ap_unexpected_nlpid = 0;
 }
 
 void cfg80211_mlme_purge_registrations(struct wireless_dev *wdev)
@@ -1072,3 +1075,16 @@ void cfg80211_cqm_pktloss_notify(struct net_device *dev,
 	nl80211_send_cqm_pktloss_notify(rdev, dev, peer, num_packets, gfp);
 }
 EXPORT_SYMBOL(cfg80211_cqm_pktloss_notify);
+
+bool cfg80211_rx_spurious_frame(struct net_device *dev,
+        const u8 *addr, gfp_t gfp)
+{
+  struct wireless_dev *wdev = dev->ieee80211_ptr;
+
+  if (WARN_ON(wdev->iftype != NL80211_IFTYPE_AP &&
+        wdev->iftype != NL80211_IFTYPE_P2P_GO))
+    return false;
+
+  return nl80211_unexpected_frame(dev, addr, gfp);
+}
+EXPORT_SYMBOL(cfg80211_rx_spurious_frame);
