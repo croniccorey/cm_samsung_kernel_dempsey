@@ -75,6 +75,8 @@ static void blk_done(struct virtqueue *vq)
 		case REQ_TYPE_SPECIAL:
 			vbr->req->errors = (error != 0);
 			break;
+		default:
+			break;
 		}
 
 		__blk_end_request_all(vbr->req, error);
@@ -386,11 +388,13 @@ static int __devinit virtblk_probe(struct virtio_device *vdev)
 	vblk->disk->driverfs_dev = &vdev->dev;
 	index++;
 
-	/* If barriers are supported, tell block layer that queue is ordered */
-	if (virtio_has_feature(vdev, VIRTIO_BLK_F_FLUSH))
-		blk_queue_ordered(q, QUEUE_ORDERED_DRAIN_FLUSH, NULL);
-	else if (virtio_has_feature(vdev, VIRTIO_BLK_F_BARRIER))
-		blk_queue_ordered(q, QUEUE_ORDERED_TAG, NULL);
+	if (virtio_has_feature(vdev, VIRTIO_BLK_F_FLUSH)) {
+		/*
+		 * If the FLUSH feature is supported we do have support for
+		 * flushing a volatile write cache on the host.  Use that
+		 * to implement write barrier support.
+		 */
+		blk_queue_ordered(q, QUEUE_ORDERED_DRAIN_FLUSH);
 	} else {
 		/*
 		 * If the FLUSH feature is not supported we must assume that
@@ -398,7 +402,7 @@ static int __devinit virtblk_probe(struct virtio_device *vdev)
 		 * caching. We still need to drain the queue to provider
 		 * proper barrier semantics.
 		 */
-		blk_queue_ordered(q, QUEUE_ORDERED_DRAIN, NULL);
+		blk_queue_ordered(q, QUEUE_ORDERED_DRAIN);
 	}
 
 	/* If disk is read-only in the host, the guest should obey */
