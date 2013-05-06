@@ -736,8 +736,7 @@ start_journal_io:
 		if (err)
 			__jbd2_journal_abort_hard(journal);
 		if (journal->j_flags & JBD2_BARRIER)
-			blkdev_issue_flush(journal->j_dev, GFP_KERNEL, NULL,
-				BLKDEV_IFL_WAIT);
+			blkdev_issue_flush(journal->j_fs_dev, GFP_KERNEL, NULL);
 	}
 
 	err = journal_finish_inode_data_buffers(journal, commit_transaction);
