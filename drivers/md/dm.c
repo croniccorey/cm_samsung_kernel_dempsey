@@ -1456,20 +1456,9 @@ static int dm_request(struct request_queue *q, struct bio *bio)
 	return _dm_request(q, bio);
 }
 
-/*
- * Mark this request as flush request, so that dm_request_fn() can
- * recognize.
- */
-static void dm_rq_prepare_flush(struct request_queue *q, struct request *rq)
-{
-	rq->cmd_type = REQ_TYPE_LINUX_BLOCK;
-	rq->cmd[0] = REQ_LB_OP_FLUSH;
-}
-
 static bool dm_rq_is_flush_request(struct request *rq)
 {
-	if (rq->cmd_type == REQ_TYPE_LINUX_BLOCK &&
-	    rq->cmd[0] == REQ_LB_OP_FLUSH)
+	if (rq->cmd_flags & REQ_FLUSH)
 		return true;
 	else
 		return false;
