@@ -793,12 +793,9 @@ sdev_store_queue_type_rw(struct device *dev, struct device_attribute *attr,
 	if (tag_type == prev_tag_type)
 		return count;
 
-	retval = sht->change_queue_depth(sdev, depth,
-                                    SCSI_QDEPTH_DEFAULT);
+	retval = sht->change_queue_type(sdev, tag_type);
 	if (retval < 0)
 		return retval;
-
-	sdev->max_queue_depth = sdev->queue_depth;
 
 	return count;
 }
