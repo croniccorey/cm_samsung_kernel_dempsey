@@ -383,7 +383,9 @@ struct bus_type scsi_bus_type = {
         .name		= "scsi",
         .match		= scsi_bus_match,
 	.uevent		= scsi_bus_uevent,
-	.pm		= &scsi_bus_pm_ops,
+#ifdef CONFIG_PM
+	.pm    = &scsi_bus_pm_ops,
+#endif
 };
 EXPORT_SYMBOL_GPL(scsi_bus_type);
 
@@ -791,9 +793,12 @@ sdev_store_queue_type_rw(struct device *dev, struct device_attribute *attr,
 	if (tag_type == prev_tag_type)
 		return count;
 
-	retval = sht->change_queue_type(sdev, tag_type);
+	retval = sht->change_queue_depth(sdev, depth,
+                                    SCSI_QDEPTH_DEFAULT);
 	if (retval < 0)
 		return retval;
+
+	sdev->max_queue_depth = sdev->queue_depth;
 
 	return count;
 }
