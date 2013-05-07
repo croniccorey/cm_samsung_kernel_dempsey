@@ -60,7 +60,7 @@ static inline void blk_clear_rq_urgent(struct request *rq)
 /*
  * Internal elevator interface
  */
-#define ELV_ON_HASH(rq) hash_hashed(&(rq)->hash)
+#define ELV_ON_HASH(rq)		(!hlist_unhashed(&(rq)->hash))
 
 struct request *blk_do_flush(struct request_queue *q, struct request *rq);
 
