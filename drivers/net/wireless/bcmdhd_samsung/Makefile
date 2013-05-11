@@ -134,7 +134,7 @@ EXTRA_CFLAGS += -DDHD_DEBUG -DSRCBASE=\"$(src)/\"
 EXTRA_CFLAGS += -I$(src)/include/
 EXTRA_CFLAGS += -I$(src)/
 
-#EXTRA_LDFLAGS += --strip-debug
+EXTRA_LDFLAGS += --strip-debug
 KBUILD_CFLAGS += -I$(LINUXDIR)/include -I$(shell pwd)
 
 ifeq ($(CONFIG_BCM4334),m)
