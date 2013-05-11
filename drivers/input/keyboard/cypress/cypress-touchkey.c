@@ -82,6 +82,7 @@ int touchkey_ldo_on(bool on)
 
 #endif
 
+extern bool bln_enabled;
 
 struct cypress_touchkey_devdata {
 	struct i2c_client *client;
@@ -277,7 +278,7 @@ static void cypress_touchkey_early_suspend(struct early_suspend *h)
 
 	disable_irq(devdata->client->irq);
 
-#ifdef CONFIG_GENERIC_BLN
+if (bln_enabled) {
   /*
    * Disallow powering off the touchkey controller
    * while a led notification is ongoing
@@ -286,9 +287,9 @@ static void cypress_touchkey_early_suspend(struct early_suspend *h)
     devdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
     devdata->pdata->touchkey_sleep_onoff(TOUCHKEY_OFF);
   }
-#else 
-	devdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
-#endif 
+} else {
+     devdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
+}
 
     #if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 		touchkey_ldo_on(0);
