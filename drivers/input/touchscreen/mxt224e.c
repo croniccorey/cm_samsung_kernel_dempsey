@@ -49,10 +49,6 @@
 #include <linux/touch_wake.h>
 #endif 
 
-#ifdef CONFIG_BLD
-#include <linux/bld.h>
-#endif 
-
 #define OBJECT_TABLE_START_ADDRESS	7
 #define OBJECT_TABLE_ELEMENT_SIZE	6
 
@@ -1048,6 +1044,10 @@ static void report_input_data(struct mxt224_data *data)
 		#endif
 
 		input_mt_sync(data->input_dev);
+#ifdef CONFIG_TOUCH_WAKE
+  }
+  touch_press();
+#endif
 
 		if (g_debug_switch)
 			printk(KERN_ERR "[TSP] ID-%d, %4d,%4d\n", i, data->fingers[i].x, data->fingers[i].y);
@@ -1068,21 +1068,9 @@ static void report_input_data(struct mxt224_data *data)
 
 #endif
 
+
 		if (data->fingers[i].z == 0)
 			data->fingers[i].z = -1;
-
-#ifdef CONFIG_TOUCH_WAKE
-  }
-  touch_press();
-#endif
-
-#ifdef CONFIG_BLD
-    if (system_rev >= 0x30 && data->fingers[i].y > BLD_TOUCHKEYS_POSITION)
-        {
-      touchkey_pressed();
-        }
-#endif 
-
 	}
 	data->finger_mask = 0;
 	touch_state = 0;
