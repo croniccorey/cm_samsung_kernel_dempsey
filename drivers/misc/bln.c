@@ -23,11 +23,11 @@ EXPORT_SYMBOL(bln_enabled);
 
 static bool bln_ongoing = false; /* ongoing LED Notification */
 static int bln_blink_state = 0;
-static int bln_blink_interval = 500;
-static int bln_blink_max_count = 600;
+static int bln_blink_interval = 1000;
+static int bln_blink_max_count = 60000;
 static bool bln_suspended = false; /* is system suspended */
 static struct bln_implementation *bln_imp = NULL;
-static bool in_kernel_blink = false;
+static bool in_kernel_blink = true;
 static uint32_t blink_count;
 
 static struct wake_lock bln_wake_lock;

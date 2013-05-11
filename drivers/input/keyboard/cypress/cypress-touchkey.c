@@ -646,7 +646,7 @@ static void cypress_touchkey_disable_led_notification(void){
      * This is actually not needed, the early_suspend function
      * should take care of powering off the touchkey controller
      */
-  //  blndevdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
+    blndevdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
     touchkey_ldo_on(0);
   }
 #ifdef CONFIG_TOUCH_WAKE
@@ -761,6 +761,11 @@ static int cypress_touchkey_probe(struct i2c_client *client,
 
 	devdata->is_powering_on = false;
 
+#ifdef CONFIG_GENERIC_BLN
+  blndevdata = devdata;
+  register_bln_implementation(&cypress_touchkey_bln);
+#endif
+
 #if defined(TOUCH_UPDATE)
 	ret = misc_register(&touchkey_update_device);
 	if (ret) {
@@ -841,11 +846,6 @@ static int cypress_touchkey_probe(struct i2c_client *client,
 #endif
 
 #endif
-
-#ifdef CONFIG_GENERIC_BLN
-  blndevdata = devdata;
-  register_bln_implementation(&cypress_touchkey_bln);
-#endif 
 
 	return 0;
 
