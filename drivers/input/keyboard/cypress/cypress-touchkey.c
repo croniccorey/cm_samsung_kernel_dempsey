@@ -639,6 +639,7 @@ static void cypress_touchkey_disable_led_notification(void){
 
   /* if touchkeys lights are not used for touchmode */
   if (blndevdata->is_powering_on){
+    disable_touchkey_backlights();
 #if 0
     /*
      * power off the touchkey controller
@@ -648,7 +649,6 @@ static void cypress_touchkey_disable_led_notification(void){
     blndevdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
 #endif
     touchkey_ldo_on(0);
-    disable_touchkey_backlights();
   }
 #ifdef CONFIG_TOUCH_WAKE
   else
