@@ -615,7 +615,7 @@ static void cypress_touchkey_enable_led_notification(void){
 
 	touchkey_ldo_on(1);
 
-//    blndevdata->pdata->touchkey_onoff(TOUCHKEY_ON);
+    blndevdata->pdata->touchkey_onoff(TOUCHKEY_ON);
 
     /* write to i2cbus, enable backlights */
     enable_touchkey_backlights();
@@ -639,15 +639,16 @@ static void cypress_touchkey_disable_led_notification(void){
 
   /* if touchkeys lights are not used for touchmode */
   if (blndevdata->is_powering_on){
-    disable_touchkey_backlights();
-
+#if 0
     /*
      * power off the touchkey controller
      * This is actually not needed, the early_suspend function
      * should take care of powering off the touchkey controller
      */
     blndevdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
+#endif
     touchkey_ldo_on(0);
+    disable_touchkey_backlights();
   }
 #ifdef CONFIG_TOUCH_WAKE
   else
@@ -855,7 +856,7 @@ err_create_wq:
 #endif
 err_misc_reg:
 err_req_irq:
-err_backlight_on:
+//err_backlight_on:
 err_read:
 	devdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
 	input_unregister_device(input_dev);
