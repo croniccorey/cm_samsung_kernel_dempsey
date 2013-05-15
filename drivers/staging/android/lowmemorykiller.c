@@ -35,7 +35,6 @@
 #include <linux/oom.h>
 #include <linux/sched.h>
 #include <linux/notifier.h>
-#include <linux/compaction.h>
 
 #define SEC_ADJUST_LMK
 
@@ -57,8 +56,6 @@ static int lowmem_minfree_size = 4;
 
 static struct task_struct *lowmem_deathpending;
 static unsigned long lowmem_deathpending_timeout;
-
-extern int compact_nodes();
 
 #define lowmem_print(level, x...)			\
 	do {						\
@@ -206,8 +203,6 @@ static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 	lowmem_print(4, "lowmem_shrink %d, %x, return %d\n",
 		     nr_to_scan, gfp_mask, rem);
 	read_unlock(&tasklist_lock);
-	if (selected)
-	        compact_nodes(false);
 	return rem;
 }
 
