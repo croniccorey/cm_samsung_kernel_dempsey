@@ -83,13 +83,19 @@ static VibeInt8 g_nForceLog[FORCE_LOG_BUFFER_SIZE];
 #include "VibeOSKernelLinuxTime.c"
 
 /* timed_output */
-#define VIBRATOR_PERIOD	87084/2
-#define VIBRATOR_DUTY	87000/2
+#define PWM_PERIOD  43542
+#define PWM_DUTY_MAX  43500
+#define PWM_DUTY_MIN  21750
+
+static unsigned int pwm_duty    = 100;
+static unsigned int pwm_duty_value  = PWM_DUTY_MAX;
+static unsigned int multiplier    = (PWM_DUTY_MAX - PWM_DUTY_MIN) / 100;
 
 static struct hrtimer timer;
 
 static int max_timeout = 5000;
 static int vibrator_value = 0;
+static int pwm_value = 0;
 
 struct pwm_device	*vib_pwm;
 
@@ -105,7 +111,7 @@ static int set_vibetonz(int timeout)
 	}
 	else {
             	wake_lock(&vib_wake_lock);
-		pwm_config(Immvib_pwm, VIBRATOR_DUTY, VIBRATOR_PERIOD);
+		pwm_config(Immvib_pwm, pwm_duty_value, PWM_PERIOD);
 		pwm_enable(Immvib_pwm);
 		
 		printk("[VIBETONZ] ENABLE\n");
@@ -180,6 +186,35 @@ static void vibetonz_start(void)
 		printk(KERN_ERR "[VIBETONZ] timed_output_dev_register is fail \n");	
 }
 
+static ssize_t victory_vibrator_set_duty(struct device *dev,
+          struct device_attribute *attr,
+          const char *buf, size_t size)
+{
+  sscanf(buf, "%d\n", &pwm_duty);
+
+  if (pwm_duty >= 0 && pwm_duty <= 100)
+    pwm_duty_value = (pwm_duty * multiplier) + PWM_DUTY_MIN;
+
+  return size;
+}
+static ssize_t victory_vibrator_show_duty(struct device *dev,
+          struct device_attribute *attr,
+          const char *buf)
+{
+  return sprintf(buf, "%d", pwm_duty);
+}
+static DEVICE_ATTR(pwm_duty, S_IRUGO | S_IWUGO, victory_vibrator_show_duty, victory_vibrator_set_duty);
+static struct attribute *pwm_duty_attributes[] = {
+  &dev_attr_pwm_duty,
+  NULL
+};
+static struct attribute_group pwm_duty_group = {
+  .attrs = pwm_duty_attributes,
+};
+static struct miscdevice pwm_duty_device = {
+  .minor = MISC_DYNAMIC_MINOR,
+  .name = "pwm_duty",
+};
 
 /* File IO */
 static int open(struct inode *inode, struct file *file);
@@ -322,6 +357,14 @@ int init_module(void)
     }
     
     wake_lock_init(&vib_wake_lock, WAKE_LOCK_SUSPEND, "vib_present");
+
+if (misc_register(&pwm_duty_device)) {
+    printk("%s misc_register(pwm_duty) failed\n", __FUNCTION__);
+  } else {
+    if (sysfs_create_group(&pwm_duty_device.this_device->kobj, &pwm_duty_group)) {
+      printk("failed to create sysfs group for device pwm_duty\n");
+    }
+  }
 
 #ifdef VIBE_TUNING
 	// ---------- file creation at '/sys/class/vibetonz/immTest'------------------------------
