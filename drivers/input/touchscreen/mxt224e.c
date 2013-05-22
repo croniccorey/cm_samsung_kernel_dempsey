@@ -1016,7 +1016,9 @@ static void report_input_data(struct mxt224_data *data)
 {
 	int i;
 	int presscount = 0, movecount = 0;
-
+	int num_fingers_down;
+ 
+  	num_fingers_down = 0;
 	touch_is_pressed = 0;
 
 	for (i = 0; i < data->num_fingers; i++) {
@@ -1026,8 +1028,8 @@ static void report_input_data(struct mxt224_data *data)
 
 		input_report_abs(data->input_dev, ABS_MT_POSITION_X, data->fingers[i].x);
 		input_report_abs(data->input_dev, ABS_MT_POSITION_Y, data->fingers[i].y);
-		input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, data->fingers[i].z);
-		input_report_abs(data->input_dev, ABS_MT_WIDTH_MAJOR, data->fingers[i].w);
+		input_report_abs(data->input_dev, ABS_MT_PRESSURE, data->fingers[i].z);
+		input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, data->fingers[i].w);
 		input_report_abs(data->input_dev, ABS_MT_TRACKING_ID, i);
 
 		#ifdef _SUPPORT_SHAPE_TOUCH_
@@ -1057,11 +1059,12 @@ static void report_input_data(struct mxt224_data *data)
 #endif
 
 
-		if (data->fingers[i].z == 0)
-			data->fingers[i].z = -1;
+		num_fingers_down++;
 	}
 	data->finger_mask = 0;
 	touch_state = 0;
+	if (num_fingers_down == 0)
+	    input_mt_sync(data->input_dev);
 	input_sync(data->input_dev);
 
 	if(cal_check_flag && presscount && movecount)
@@ -1447,7 +1450,7 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 				report_input_data(data);
 
 			if (msg[1] & RELEASE_MSG_MASK) {
-				data->fingers[id].z = 0;
+				data->fingers[id].z = -1;
 				data->fingers[id].w = msg[5];
 				data->finger_mask |= 1U << id;
 				//s5pv310_cpufreq_lock_free(DVFS_LOCK_ID_TSP);
@@ -1488,7 +1491,7 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 				#endif
 
 			} else if ((msg[1] & SUPPRESS_MSG_MASK) && (data->fingers[id].z != -1)) {
-				data->fingers[id].z = 0;
+				data->fingers[id].z = -1;
 				data->fingers[id].w = msg[5];
 				data->finger_mask |= 1U << id;
 			} else {
@@ -1520,26 +1523,18 @@ static int mxt224_internal_suspend(struct mxt224_data *data)
 
 	if (ta_status) {
 		printk(KERN_ERR"[TSP] sleep \n");
-		for (i = 0; i < data->num_fingers; i++) {
-			if (data->fingers[i].z == -1)
-				continue;
-
-			touch_is_pressed_arr[i] = 0;
-			data->fingers[i].z = 0;
-		}
+		for (i = 0; i < data->num_fingers; i++)
+			data->fingers[i].z = -1;
+		touch_is_pressed_arr[i] = 0;
 		report_input_data(data);
 
 		ret = write_config(data, GEN_POWERCONFIG_T7, sleep_power_cfg);
 		sleep_mode_flag = 1;
 	}else{
 #endif /* CONFIG_TARGET_LOCALE_NA */
-	for (i = 0; i < data->num_fingers; i++) {
-		if (data->fingers[i].z == -1)
-			continue;
-
-		touch_is_pressed_arr[i] = 0;
-		data->fingers[i].z = 0;
-	}
+	for (i = 0; i < data->num_fingers; i++)
+	    data->fingers[i].z = -1;
+	touch_is_pressed_arr[i] = 0;
 	report_input_data(data);
 
 	data->power_off();
@@ -1595,12 +1590,9 @@ static void mxt224_early_suspend(struct early_suspend *h)
 	touch_is_pressed = 0;
 	disable_irq(data->client->irq);
 
-	for (i = 0; i < data->num_fingers; i++) {
-		if (data->fingers[i].z == -1)
-			continue;
+		for (i = 0; i < data->num_fingers; i++)
+			data->fingers[i].z = -1;
 		touch_is_pressed_arr[i] = 0;
-		data->fingers[i].z = 0;
-	}
 	report_input_data(data);
 
 	data->power_off();
@@ -2324,12 +2316,9 @@ static ssize_t set_module_off_show(struct device *dev, struct device_attribute *
 	touch_is_pressed = 0;
 	disable_irq(data->client->irq);
 
-	for (i = 0; i < data->num_fingers; i++) {
-		if (data->fingers[i].z == -1)
-			continue;
+		for (i = 0; i < data->num_fingers; i++)
+			data->fingers[i].z = -1;
 		touch_is_pressed_arr[i] = 0;
-		data->fingers[i].z = 0;
-	}
 	report_input_data(data);
 
 	data->power_off();
@@ -2891,9 +2880,9 @@ static int __devinit mxt224_probe(struct i2c_client *client, const struct i2c_de
 			pdata->max_x, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_POSITION_Y, pdata->min_y,
 			pdata->max_y, 0, 0);
-	input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR, pdata->min_z,
+	input_set_abs_params(input_dev, ABS_MT_PRESSURE, pdata->min_z,
 			pdata->max_z, 0, 0);
-	input_set_abs_params(input_dev, ABS_MT_WIDTH_MAJOR, pdata->min_w,
+	input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR, pdata->min_w,
 			pdata->max_w, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_TRACKING_ID, 0,
 			data->num_fingers - 1, 0, 0);
