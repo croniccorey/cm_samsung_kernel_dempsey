@@ -411,6 +411,15 @@
  *	more background information, see
  *	http://wireless.kernel.org/en/users/Documentation/WoWLAN.
  *
+ *
+ * @NL80211_CMD_SET_REKEY_OFFLOAD: This command is used give the driver
+ * the necessary information for supporting GTK rekey offload. This
+ * feature is typically used during WoWLAN. The configuration data
+ * is contained in %NL80211_ATTR_REKEY_DATA (which is nested and
+ * contains the data in sub-attributes). After rekeying happened,
+ * this command may also be sent by the driver as an MLME event to
+ * inform userspace of the new replay counter.
+ *
  * @NL80211_CMD_UNPROT_DEAUTHENTICATE: Unprotected deauthentication frame
  *	notification. This event is used to indicate that an unprotected
  *	deauthentication frame was dropped when MFP is in use.
@@ -931,6 +940,8 @@ enum nl80211_commands {
  *	used by %NL80211_CMD_GET_WOWLAN to get the currently enabled WoWLAN
  *	triggers.
  *
+ * @%NL80211_ATTR_REKEY_DATA: nested attribute containing the information
+ * necessary for GTK rekeying in the device, see &enum nl80211_rekey_data.
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
  */
@@ -1120,6 +1131,8 @@ enum nl80211_attrs {
 
 	NL80211_ATTR_WOWLAN_TRIGGERS,
 	NL80211_ATTR_WOWLAN_TRIGGERS_SUPPORTED,
+
+	NL80211_ATTR_REKEY_DATA,
 
 	NL80211_ATTR_PMKSA_CANDIDATE,
 
