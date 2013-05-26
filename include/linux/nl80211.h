@@ -557,6 +557,8 @@ enum nl80211_commands {
 	NL80211_CMD_TDLS_OPER,
   	NL80211_CMD_TDLS_MGMT,
 
+	NL80211_CMD_SET_REKEY_OFFLOAD,
+
 	/* add new commands above here */
 
 	/* used to define NL80211_CMD_MAX below */
@@ -2171,6 +2173,30 @@ enum nl80211_wowlan_triggers {
 	NUM_NL80211_WOWLAN_TRIG,
 	MAX_NL80211_WOWLAN_TRIG = NUM_NL80211_WOWLAN_TRIG - 1
 };
+
+#define NL80211_KCK_LEN      16
+#define NL80211_KEK_LEN      16
+#define NL80211_REPLAY_CTR_LEN    8
+
+/**
+ * enum nl80211_rekey_data - attributes for GTK rekey offload
+ * @__NL80211_REKEY_DATA_INVALID: invalid number for nested attributes
+ * @NL80211_REKEY_DATA_KEK: key encryption key (binary)
+ * @NL80211_REKEY_DATA_KCK: key confirmation key (binary)
+ * @NL80211_REKEY_DATA_REPLAY_CTR: replay counter (binary)
+ * @NUM_NL80211_REKEY_DATA: number of rekey attributes (internal)
+ * @MAX_NL80211_REKEY_DATA: highest rekey attribute (internal)
+ */
+enum nl80211_rekey_data {
+  __NL80211_REKEY_DATA_INVALID,
+  NL80211_REKEY_DATA_KEK,
+  NL80211_REKEY_DATA_KCK,
+  NL80211_REKEY_DATA_REPLAY_CTR,
+
+  /* keep last */
+  NUM_NL80211_REKEY_DATA,
+  MAX_NL80211_REKEY_DATA = NUM_NL80211_REKEY_DATA - 1
+}; 
 
 /**
  * enum nl80211_hidden_ssid - values for %NL80211_ATTR_HIDDEN_SSID
