@@ -46,7 +46,6 @@
 #include <linux/vmalloc.h>
 #include <linux/mm_inline.h>
 #include <linux/page_cgroup.h>
-#include <linux/oom.h>
 #include <linux/cpu.h>
 #include "internal.h"
 
@@ -837,13 +836,12 @@ int task_in_mem_cgroup(struct task_struct *task, const struct mem_cgroup *mem)
 {
 	int ret;
 	struct mem_cgroup *curr = NULL;
-	struct task_struct *p;
 
-	p = find_lock_task_mm(task);
-	if (!p)
-		return 0;
-	curr = try_get_mem_cgroup_from_mm(p->mm);
-	task_unlock(p);
+	task_lock(task);
+	rcu_read_lock();
+	curr = try_get_mem_cgroup_from_mm(task->mm);
+	rcu_read_unlock();
+	task_unlock(task);
 	if (!curr)
 		return 0;
 	/*
