@@ -116,14 +116,14 @@ struct nf_conn {
 	u_int32_t secmark;
 #endif
 
-	/* Storage reserved for other modules: */
-	union nf_conntrack_proto proto;
-
 	/* Extensions */
 	struct nf_ct_ext *ext;
 #ifdef CONFIG_NET_NS
 	struct net *ct_net;
 #endif
+
+/* Storage reserved for other modules, must be the last member */
+  union nf_conntrack_proto proto;
 };
 
 static inline struct nf_conn *
@@ -152,11 +152,7 @@ extern struct net init_net;
 
 static inline struct net *nf_ct_net(const struct nf_conn *ct)
 {
-#ifdef CONFIG_NET_NS
-	return ct->ct_net;
-#else
-	return &init_net;
-#endif
+	return read_pnet(&ct->ct_net);
 }
 
 /* Alter reply tuple (maybe alter helper). */
@@ -193,9 +189,9 @@ extern void nf_ct_l3proto_module_put(unsigned short l3proto);
  * Allocate a hashtable of hlist_head (if nulls == 0),
  * or hlist_nulls_head (if nulls == 1)
  */
-extern void *nf_ct_alloc_hashtable(unsigned int *sizep, int *vmalloced, int nulls);
+extern void *nf_ct_alloc_hashtable(unsigned int *sizep, int nulls);
 
-extern void nf_ct_free_hashtable(void *hash, int vmalloced, unsigned int size);
+extern void nf_ct_free_hashtable(void *hash, unsigned int size);
 
 extern struct nf_conntrack_tuple_hash *
 __nf_conntrack_find(struct net *net, u16 zone,
@@ -261,11 +257,10 @@ extern s16 (*nf_ct_nat_offset)(const struct nf_conn *ct,
 			       u32 seq);
 
 /* Fake conntrack entry for untracked connections */
+DECLARE_PER_CPU(struct nf_conn, nf_conntrack_untracked);
 static inline struct nf_conn *nf_ct_untracked_get(void)
 {
-	extern struct nf_conn nf_conntrack_untracked;
-
-	return &nf_conntrack_untracked;
+	return &__raw_get_cpu_var(nf_conntrack_untracked);
 }
 extern void nf_ct_untracked_status_or(unsigned long bits);
 
@@ -303,6 +298,8 @@ static inline int nf_ct_is_untracked(const struct nf_conn *ct)
 extern int nf_conntrack_set_hashsize(const char *val, struct kernel_param *kp);
 extern unsigned int nf_conntrack_htable_size;
 extern unsigned int nf_conntrack_max;
+extern unsigned int nf_conntrack_hash_rnd;
+void init_nf_conntrack_hash_rnd(void);
 
 #define NF_CT_STAT_INC(net, count)	\
 	__this_cpu_inc((net)->ct.stat->count)
