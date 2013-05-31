@@ -334,10 +334,7 @@ static void nf_ct_expect_insert(struct nf_conntrack_expect *exp)
 	setup_timer(&exp->timeout, nf_ct_expectation_timed_out,
 		    (unsigned long)exp);
 	if (master_help) {
-		p = &rcu_dereference_protected(
-			master_help->helper,
-			lockdep_is_held(&nf_conntrack_lock)
-			)->expect_policy[exp->class];
+		p = &master_help->helper->expect_policy[exp->class];
 		exp->timeout.expires = jiffies + p->timeout * HZ;
 	}
 	add_timer(&exp->timeout);
@@ -396,10 +393,7 @@ static inline int __nf_ct_expect_check(struct nf_conntrack_expect *expect)
 	}
 	/* Will be over limit? */
 	if (master_help) {
-		p = &rcu_dereference_protected(
-		master_help->helper,
-		lockdep_is_held(&nf_conntrack_lock)
-		)->expect_policy[expect->class];
+		p = &master_help->helper->expect_policy[expect->class];
 		if (p->max_expected &&
   			master_help->expecting[expect->class] >= p->max_expected) {
 			evict_oldest_expect(master, expect);
@@ -470,7 +464,7 @@ static struct hlist_node *ct_expect_get_first(struct seq_file *seq)
 	struct hlist_node *n;
 
 	for (st->bucket = 0; st->bucket < nf_ct_expect_hsize; st->bucket++) {
-		n = rcu_dereference(hlist_first_rcu(&net->ct.expect_hash[st->bucket]));
+		n = rcu_dereference(net->ct.expect_hash[st->bucket].first);
 		if (n)
 			return n;
 	}
@@ -483,11 +477,11 @@ static struct hlist_node *ct_expect_get_next(struct seq_file *seq,
 	struct net *net = seq_file_net(seq);
 	struct ct_expect_iter_state *st = seq->private;
 
-	head = rcu_dereference(hlist_next_rcu(head));
+	head = rcu_dereference(head->next);
 	while (head == NULL) {
 		if (++st->bucket >= nf_ct_expect_hsize)
 			return NULL;
-		head = rcu_dereference(hlist_first_rcu(&net->ct.expect_hash[st->bucket]));
+		head = rcu_dereference(net->ct.expect_hash[st->bucket].first);
 	}
 	return head;
 }

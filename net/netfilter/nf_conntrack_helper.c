@@ -157,10 +157,7 @@ static inline int unhelp(struct nf_conntrack_tuple_hash *i,
 	struct nf_conn *ct = nf_ct_tuplehash_to_ctrack(i);
 	struct nf_conn_help *help = nfct_help(ct);
 
-	if (help && rcu_dereference_protected(
-		help->helper,
-		lockdep_is_held(&nf_conntrack_lock)
-		) == me) {
+	if (help && help->helper == me) {
 		nf_conntrack_event(IPCT_HELPER, ct);
 		rcu_assign_pointer(help->helper, NULL);
 	}
@@ -212,10 +209,7 @@ static void __nf_conntrack_helper_unregister(struct nf_conntrack_helper *me,
 		hlist_for_each_entry_safe(exp, n, next,
 					  &net->ct.expect_hash[i], hnode) {
 			struct nf_conn_help *help = nfct_help(exp->master);
-			if ((rcu_dereference_protected(
-				help->helper,
-				lockdep_is_held(&nf_conntrack_lock)
-				) == me || exp->helper == me) &&
+			if ((help->helper == me || exp->helper == me) &&
 				    del_timer(&exp->timeout)) {
 				nf_ct_unlink_expect(exp);
 				nf_ct_expect_put(exp);
