@@ -1011,7 +1011,6 @@ static void disk_release(struct device *dev)
 	kfree(disk->random);
 	disk_replace_part_tbl(disk, NULL);
 	free_part_stats(&disk->part0);
-	free_part_info(&disk->part0);
 	kfree(disk);
 }
 
