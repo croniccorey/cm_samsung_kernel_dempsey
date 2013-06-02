@@ -116,7 +116,7 @@ static int blkdev_reread_part(struct block_device *bdev)
 static int blk_ioctl_discard(struct block_device *bdev, uint64_t start,
 			     uint64_t len, int secure)
 {
-	unsigned long flags = 0;
+	unsigned long flags = BLKDEV_IFL_WAIT;
 
 	if (start & 511)
 		return -EINVAL;
@@ -128,7 +128,7 @@ static int blk_ioctl_discard(struct block_device *bdev, uint64_t start,
 	if (start + len > (i_size_read(bdev->bd_inode) >> 9))
 		return -EINVAL;
 	if (secure)
-		flags |= BLKDEV_DISCARD_SECURE;
+		flags |= BLKDEV_IFL_SECURE;
 	return blkdev_issue_discard(bdev, start, len, GFP_KERNEL, flags);
 }
 
