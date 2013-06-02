@@ -358,12 +358,8 @@ static void VsyncWorkqueueFunc(struct work_struct *psWork)
 
 static S3C_BOOL CreateVsyncWorkQueue(S3C_LCD_DEVINFO *psDevInfo)
 {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
 	psDevInfo->psWorkQueue = alloc_workqueue("vsync_workqueue",
 											 WQ_UNBOUND | WQ_HIGHPRI, 1);
-#else
-	psDevInfo->psWorkQueue = create_rt_workqueue("vsync_workqueue");
-#endif
 
 	if (psDevInfo->psWorkQueue == IMG_NULL)
 	{
