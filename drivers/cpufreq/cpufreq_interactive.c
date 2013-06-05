@@ -34,7 +34,7 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/cpufreq_interactive.h>
 
-static atomic_t active_count = ATOMIC_INIT(0);
+static int active_count;
 
 struct cpufreq_interactive_cpuinfo {
 	struct timer_list cpu_timer;
@@ -52,6 +52,7 @@ struct cpufreq_interactive_cpuinfo {
 	u64 hispeed_validate_time;
 	struct rw_semaphore enable_sem;
 	int governor_enabled;
+	int cpu_load;
 };
 
 static DEFINE_PER_CPU(struct cpufreq_interactive_cpuinfo, cpuinfo);
@@ -60,9 +61,18 @@ static DEFINE_PER_CPU(struct cpufreq_interactive_cpuinfo, cpuinfo);
 static struct task_struct *speedchange_task;
 static cpumask_t speedchange_cpumask;
 static spinlock_t speedchange_cpumask_lock;
+static struct mutex gov_lock;
 
 /* Hi speed to bump to from lo speed when load burst (default max) */
 static unsigned int hispeed_freq;
+
+/* When the boostpulse was activated */
+static u64 boostpulse_boosted_time;
+
+/* How long the boostpulse will remain active */
+#define DEFAULT_BOOSTPULSE_DURATION    500000
+#define MAX_BOOSTPULSE_DURATION                5000000
+static int boostpulse_duration;
 
 /* Go to hi speed when CPU load at or above this value. */
 #define DEFAULT_GO_HISPEED_LOAD 99
@@ -94,12 +104,11 @@ static unsigned long timer_rate = DEFAULT_TIMER_RATE;
 #define DEFAULT_ABOVE_HISPEED_DELAY DEFAULT_TIMER_RATE
 static unsigned long above_hispeed_delay_val = DEFAULT_ABOVE_HISPEED_DELAY;
 
-/* Non-zero means indefinite speed boost active */
+/*
+ * Non-zero means longer-term speed boost active.
+ */
+
 static int boost_val;
-/* Duration of a boot pulse in usecs */
-static int boostpulse_duration_val = DEFAULT_MIN_SAMPLE_TIME;
-/* End time of boost pulse in ktime converted to usecs */
-static u64 boostpulse_endtime;
 
 /*
  * Max additional time to wait in idle, beyond timer_rate, at speeds above
@@ -278,7 +287,6 @@ static void cpufreq_interactive_timer(unsigned long data)
 	unsigned int loadadjfreq;
 	unsigned int index;
 	unsigned long flags;
-	bool boosted;
 
 	if (!down_read_trylock(&pcpu->enable_sem))
 		return;
@@ -297,9 +305,16 @@ static void cpufreq_interactive_timer(unsigned long data)
 	do_div(cputime_speedadj, delta_time);
 	loadadjfreq = (unsigned int)cputime_speedadj * 100;
 	cpu_load = loadadjfreq / pcpu->target_freq;
-	boosted = boost_val || now < boostpulse_endtime;
 
-	if (cpu_load >= go_hispeed_load || boosted) {
+	if (boostpulse_boosted_time &&
+			ktime_to_us(ktime_get()) >
+			(boostpulse_boosted_time + boostpulse_duration)) {
+		/* Disable the boostpulse. */
+		boostpulse_boosted_time = 0;
+		boostpulse_duration = 0;
+	}
+
+	if (cpu_load >= go_hispeed_load || boostpulse_boosted_time) {
 		if (pcpu->target_freq < hispeed_freq) {
 			new_freq = hispeed_freq;
 		} else {
@@ -326,7 +341,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 	if (cpufreq_frequency_table_target(pcpu->policy, pcpu->freq_table,
 					   new_freq, CPUFREQ_RELATION_L,
 					   &index)) {
-		printk(KERN_DEBUG "timer %d: cpufreq_frequency_table_target error\n",
+		pr_warn_once("timer %d: cpufreq_frequency_table_target error\n",
 			     (int) data);
 		goto rearm;
 	}
@@ -346,18 +361,8 @@ static void cpufreq_interactive_timer(unsigned long data)
 		}
 	}
 
-	/*
-	 * Update the timestamp for checking whether speed has been held at
-	 * or above the selected frequency for a minimum of min_sample_time,
-	 * if not boosted to hispeed_freq.  If boosted to hispeed_freq then we
-	 * allow the speed to drop as soon as the boostpulse duration expires
-	 * (or the indefinite boost is turned off).
-	 */
-
-	if (!boosted || new_freq > hispeed_freq) {
-		pcpu->floor_freq = new_freq;
-		pcpu->floor_validate_time = now;
-	}
+	pcpu->floor_freq = new_freq;
+	pcpu->floor_validate_time = now;
 
 	if (pcpu->target_freq == new_freq) {
 		trace_cpufreq_interactive_already(
@@ -501,7 +506,7 @@ static int cpufreq_interactive_speedchange_task(void *data)
 			trace_cpufreq_interactive_setspeed(cpu,
 						     pcpu->target_freq,
 						     pcpu->policy->cur);
-
+			hispeed_freq = max_freq;
 			up_read(&pcpu->enable_sem);
 		}
 	}
@@ -819,47 +824,35 @@ static ssize_t store_boost(struct kobject *kobj, struct attribute *attr,
 
 define_one_global_rw(boost);
 
+static ssize_t show_boostpulse(struct kobject *kobj,
+				struct attribute *attr, char *buf)
+{
+	return sprintf(buf, "%lu\n", boostpulse_duration);
+}
+
 static ssize_t store_boostpulse(struct kobject *kobj, struct attribute *attr,
 				const char *buf, size_t count)
 {
 	int ret;
 	unsigned long val;
 
-	ret = kstrtoul(buf, 0, &val);
+	ret = sscanf(buf, "%lu", &val);
 	if (ret < 0)
 		return ret;
 
-	boostpulse_endtime = ktime_to_us(ktime_get()) + boostpulse_duration_val;
+	boostpulse_boosted_time = ktime_to_us(ktime_get());
+	if (val > 1 && val <= MAX_BOOSTPULSE_DURATION)
+		boostpulse_duration = val;
+	else
+		boostpulse_duration = DEFAULT_BOOSTPULSE_DURATION;
+
 	trace_cpufreq_interactive_boost("pulse");
 	cpufreq_interactive_boost();
 	return count;
 }
 
 static struct global_attr boostpulse =
-	__ATTR(boostpulse, 0200, NULL, store_boostpulse);
-
-static ssize_t show_boostpulse_duration(
-	struct kobject *kobj, struct attribute *attr, char *buf)
-{
-	return sprintf(buf, "%d\n", boostpulse_duration_val);
-}
-
-static ssize_t store_boostpulse_duration(
-	struct kobject *kobj, struct attribute *attr, const char *buf,
-	size_t count)
-{
-	int ret;
-	unsigned long val;
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-
-	boostpulse_duration_val = val;
-	return count;
-}
-
-define_one_global_rw(boostpulse_duration);
+	__ATTR(boostpulse, 0200, show_boostpulse, store_boostpulse);
 
 static struct attribute *interactive_attributes[] = {
 	&target_loads_attr.attr,
@@ -871,7 +864,6 @@ static struct attribute *interactive_attributes[] = {
 	&timer_slack.attr,
 	&boost.attr,
 	&boostpulse.attr,
-	&boostpulse_duration.attr,
 	NULL,
 };
 
@@ -913,6 +905,8 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		if (!cpu_online(policy->cpu))
 			return -EINVAL;
 
+		mutex_lock(&gov_lock);
+
 		freq_table =
 			cpufreq_frequency_get_table(policy->cpu);
 		if (!hispeed_freq)
@@ -947,20 +941,26 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		 * Do not register the idle hook and create sysfs
 		 * entries if we have already done so.
 		 */
-		if (atomic_inc_return(&active_count) > 1)
+		if (++active_count > 1) {
+			mutex_unlock(&gov_lock);
 			return 0;
+		}
 
 		rc = sysfs_create_group(cpufreq_global_kobject,
 				&interactive_attr_group);
-		if (rc)
+		if (rc) {
+			mutex_unlock(&gov_lock);
 			return rc;
+		}
 
 		idle_notifier_register(&cpufreq_interactive_idle_nb);
 		cpufreq_register_notifier(
 			&cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
+		mutex_unlock(&gov_lock);
 		break;
 
 	case CPUFREQ_GOV_STOP:
+		mutex_lock(&gov_lock);
 		for_each_cpu(j, policy->cpus) {
 			pcpu = &per_cpu(cpuinfo, j);
 			down_write(&pcpu->enable_sem);
@@ -970,14 +970,17 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			up_write(&pcpu->enable_sem);
 		}
 
-		if (atomic_dec_return(&active_count) > 0)
+		if (--active_count > 0) {
+			mutex_unlock(&gov_lock);
 			return 0;
+		}
 
 		cpufreq_unregister_notifier(
 			&cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
 		idle_notifier_unregister(&cpufreq_interactive_idle_nb);
 		sysfs_remove_group(cpufreq_global_kobject,
 				&interactive_attr_group);
+		mutex_unlock(&gov_lock);
 
 		break;
 
@@ -1017,6 +1020,7 @@ static int __init cpufreq_interactive_init(void)
 
 	spin_lock_init(&target_loads_lock);
 	spin_lock_init(&speedchange_cpumask_lock);
+	mutex_init(&gov_lock);
 	speedchange_task =
 		kthread_create(cpufreq_interactive_speedchange_task, NULL,
 			       "cfinteractive");
