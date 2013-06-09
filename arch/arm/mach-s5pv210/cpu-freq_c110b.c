@@ -50,9 +50,6 @@ static unsigned int mpll_freq; /* in MHz */
 static unsigned int apll_freq_max; /* in MHz */
 static DEFINE_MUTEX(set_freq_lock);
 
-/* UV */
-extern int exp_UV_mV[7]; 
-
 /* frequency */
 static struct cpufreq_frequency_table freq_table[] = {
 	{L0, 1600*1000},
@@ -582,7 +579,7 @@ static int s5pv210_cpufreq_target(struct cpufreq_policy *policy,
 	if (s3c_freqs.freqs.new == s3c_freqs.freqs.old && !first_run)
 		goto out;
 
-	arm_volt = exp_UV_mV[index]; //dvs_conf[index].arm_volt;
+	arm_volt = dvs_conf[index].arm_volt;
 	int_volt = dvs_conf[index].int_volt;
 
 	/* New clock information update */
@@ -765,8 +762,7 @@ static int s5pv210_cpufreq_target(struct cpufreq_policy *policy,
 	memcpy(&s3c_freqs.old, &s3c_freqs.new, sizeof(struct s3c_freq));
 	cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, KERN_INFO,
 			"cpufreq: Performance changed[L%d]\n", index);
-	//  previous_arm_volt = dvs_conf[index].arm_volt;
-		previous_arm_volt = exp_UV_mV[index];
+	previous_arm_volt = dvs_conf[index].arm_volt;
 
 	if (first_run)
 		first_run = false;
@@ -808,7 +804,7 @@ static int s5pv210_cpufreq_resume(struct cpufreq_policy *policy)
 
 	memcpy(&s3c_freqs.old, &clk_info[level],
 			sizeof(struct s3c_freq));
-	previous_arm_volt = exp_UV_mV[level]; //dvs_conf[level].arm_volt;
+	previous_arm_volt = dvs_conf[level].arm_volt;
 
 	return ret;
 }
@@ -876,7 +872,7 @@ static int __init s5pv210_cpufreq_driver_init(struct cpufreq_policy *policy)
 
 	memcpy(&s3c_freqs.old, &clk_info[level],
 			sizeof(struct s3c_freq));
-	previous_arm_volt = exp_UV_mV[level]; //dvs_conf[level].arm_volt;
+	previous_arm_volt = dvs_conf[level].arm_volt;
 
 #ifdef CONFIG_DVFS_LIMIT
 	for(i = 0; i < DVFS_LOCK_TOKEN_NUM; i++)
@@ -990,3 +986,42 @@ finish:
 }
 
 late_initcall(s5pv210_cpufreq_init);
+
+ssize_t show_UV_mV_table(struct cpufreq_policy *policy, char *buf)
+{
+	int i, len = 0;
+	for (i = 0; i <= MAX_PERF_LEVEL; i++) {
+		len += sprintf(buf + len, "%dmhz: %d mV\n", s5pv210_freq_table[i].frequency / 1000, dvs_conf[i].arm_volt / 1000);
+	}
+	return len;
+}
+
+ssize_t store_UV_mV_table(struct cpufreq_policy *policy,
+              const char *buf, size_t count)
+{
+	int ret = -EINVAL;
+	int i = 0;
+	int j = 0;
+	int u[MAX_PERF_LEVEL + 1];
+	while (j < MAX_PERF_LEVEL + 1) {
+		int consumed;
+		int val;
+		ret = sscanf(buf, "%d%n", &val, &consumed);
+		if (ret > 0) {
+			buf += consumed;
+			u[j++] = val;
+		}
+		else {
+			break;
+		}
+	}
+
+	for (i = 0; i < j; i++) {
+		if (u[i] > arm_volt_max / 1000) {
+			u[i] = arm_volt_max / 1000;
+    		}
+    		dvs_conf[i].arm_volt = u[i] * 1000;
+	}
+
+	return count;
+}

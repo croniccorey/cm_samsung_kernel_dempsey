@@ -32,9 +32,6 @@
 
 #include <trace/events/power.h>
 
-/* UV */
-int exp_UV_mV[7] = { 1400000, 1350000, 1300000, 1200000, 1050000, 950000, 950000 };
-
 /**
  * The "cpufreq driver" - the arch- or hardware-dependent low
  * level driver of CPUFreq support, and its spinlock. This lock
@@ -566,29 +563,12 @@ static ssize_t show_scaling_setspeed(struct cpufreq_policy *policy, char *buf)
 	return policy->governor->show_setspeed(policy, buf);
 }
 
-/* sysfs interface for UV control */
-static ssize_t show_UV_mV_table(struct cpufreq_policy *policy, char *buf) {
-
-return sprintf(buf, "1600mhz: %d mV\n1400mhz: %d mV\n1200mhz: %d mV\n1000mhz: %d mV\n800mhz: %d mV\n500mhz: %d mV\n200mhz: %d mV\n", exp_UV_mV[0]/1000, exp_UV_mV[1]/1000, exp_UV_mV[2]/1000, exp_UV_mV[3]/1000, exp_UV_mV[4]/1000, exp_UV_mV[5]/1000, exp_UV_mV[6]/1000);
-
-}
-
-static ssize_t store_UV_mV_table(struct cpufreq_policy *policy,
-const char *buf, size_t count) {
-
- unsigned int ret = -EINVAL;
-int i = 0;
-ret = sscanf(buf, "%d %d %d %d %d %d %d", &exp_UV_mV[0], &exp_UV_mV[1], &exp_UV_mV[2], &exp_UV_mV[3], &exp_UV_mV[4], &exp_UV_mV[5], &exp_UV_mV[6]);
-if(ret != 7) {
-return -EINVAL;
-}
-else
-for( i = 0; i < 7; i++ )
-{
-exp_UV_mV[i] *= 1000;
-}
-return count;
-}
+/**
+ * undervolting/overclocking
+ * sysfs interface
+ */
+extern ssize_t show_UV_mV_table(struct cpufreq_policy *policy, char *buf);
+extern ssize_t store_UV_mV_table(struct cpufreq_policy *policy, const char *buf, size_t count);
 
 /**
  * show_scaling_driver - show the current cpufreq HW/BIOS limitation
@@ -619,7 +599,6 @@ cpufreq_freq_attr_rw(scaling_min_freq);
 cpufreq_freq_attr_rw(scaling_max_freq);
 cpufreq_freq_attr_rw(scaling_governor);
 cpufreq_freq_attr_rw(scaling_setspeed);
-/* UV table */
 cpufreq_freq_attr_rw(UV_mV_table);
 
 static struct attribute *default_attrs[] = {
