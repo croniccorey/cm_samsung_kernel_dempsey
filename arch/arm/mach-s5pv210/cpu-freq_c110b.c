@@ -991,7 +991,7 @@ ssize_t show_UV_mV_table(struct cpufreq_policy *policy, char *buf)
 {
 	int i, len = 0;
 	for (i = 0; i <= MAX_PERF_LEVEL; i++) {
-		len += sprintf(buf + len, "%dmhz: %d mV\n", s5pv210_freq_table[i].frequency / 1000, dvs_conf[i].arm_volt / 1000);
+		len += sprintf(buf + len, "%dmhz: %d mV\n", freq_table[i].frequency / 1000, dvs_conf[i].arm_volt / 1000);
 	}
 	return len;
 }
