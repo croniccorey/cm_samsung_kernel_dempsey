@@ -289,6 +289,9 @@ extern int strict_strtoul(const char *, unsigned int, unsigned long *);
 extern int strict_strtol(const char *, unsigned int, long *);
 extern int strict_strtoull(const char *, unsigned int, unsigned long long *);
 extern int strict_strtoll(const char *, unsigned int, long long *);
+
+extern int num_to_str(char *buf, int size, unsigned long long num);
+
 extern int sprintf(char * buf, const char * fmt, ...)
 	__attribute__ ((format (printf, 2, 3)));
 extern int vsprintf(char *buf, const char *, va_list)
