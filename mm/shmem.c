@@ -2309,6 +2309,8 @@ static int shmem_show_options(struct seq_file *seq, struct vfsmount *vfs)
 
 static void shmem_put_super(struct super_block *sb)
 {
+	struct shmem_sb_info *sbinfo = SHMEM_SB(sb);
+
 	mpol_put(sbinfo->mpol);
 	kfree(sb->s_fs_info);
 	sb->s_fs_info = NULL;
