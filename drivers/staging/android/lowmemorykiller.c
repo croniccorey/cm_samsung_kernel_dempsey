@@ -38,6 +38,7 @@
 #include <linux/rcupdate.h>
 #include <linux/profile.h>
 #include <linux/swap.h>
+#include <linux/compaction.h>
 
 #define SEC_ADJUST_LMK
 
@@ -58,6 +59,8 @@ static int lowmem_minfree[6] = {
 static int lowmem_minfree_size = 4;
 
 static unsigned long lowmem_deathpending_timeout;
+
+extern int compact_nodes(bool sync);
 
 #define lowmem_print(level, x...)			\
 	do {						\
@@ -181,6 +184,8 @@ static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 	lowmem_print(4, "lowmem_shrink %d, %x, return %d\n",
 		     nr_to_scan, gfp_mask, rem);
 	rcu_read_unlock();
+	if (selected)
+		compact_nodes(false);
 	return rem;
 }
 
