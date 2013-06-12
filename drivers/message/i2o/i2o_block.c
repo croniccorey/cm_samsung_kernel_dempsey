@@ -883,7 +883,7 @@ static void i2o_block_request_fn(struct request_queue *q)
 		if (!req)
 			break;
 
-		if (blk_fs_request(req)) {
+		if (req->cmd_type == REQ_TYPE_FS) {
 			struct i2o_block_delayed_request *dreq;
 			struct i2o_block_request *ireq = req->special;
 			unsigned int queue_depth;
@@ -930,7 +930,7 @@ static const struct block_device_operations i2o_block_fops = {
 	.owner = THIS_MODULE,
 	.open = i2o_block_open,
 	.release = i2o_block_release,
-	.locked_ioctl = i2o_block_ioctl,
+	.ioctl = i2o_block_ioctl,
 	.getgeo = i2o_block_getgeo,
 	.media_changed = i2o_block_media_changed
 };

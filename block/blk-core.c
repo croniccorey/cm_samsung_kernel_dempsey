@@ -136,7 +136,7 @@ static void req_bio_endio(struct request *rq, struct bio *bio,
 {
 	struct request_queue *q = rq->q;
 
-	if (&q->bar_rq != rq) {
+	if (&q->flush_rq != rq) {
 		if (error)
 			clear_bit(BIO_UPTODATE, &bio->bi_flags);
 		else if (!test_bit(BIO_UPTODATE, &bio->bi_flags))
@@ -160,13 +160,12 @@ static void req_bio_endio(struct request *rq, struct bio *bio,
 		if (bio->bi_size == 0)
 			bio_endio(bio, error);
 	} else {
-
 		/*
-		 * Okay, this is the barrier request in progress, just
-		 * record the error;
+		 * Okay, this is the sequenced flush request in
+		 * progress, just record the error;
 		 */
-		if (error && !q->orderr)
-			q->orderr = error;
+		if (error && !q->flush_err)
+			q->flush_err = error;
 	}
 }
 
@@ -184,7 +183,7 @@ void blk_dump_rq_flags(struct request *rq, char *msg)
 	printk(KERN_INFO "  bio %p, biotail %p, buffer %p, len %u\n",
 	       rq->bio, rq->biotail, rq->buffer, blk_rq_bytes(rq));
 
-	if (blk_pc_request(rq)) {
+	if (rq->cmd_type == REQ_TYPE_BLOCK_PC) {
 		printk(KERN_INFO "  cdb: ");
 		for (bit = 0; bit < BLK_MAX_CDB; bit++)
 			printk("%02x ", rq->cmd[bit]);
@@ -382,6 +381,7 @@ void blk_sync_queue(struct request_queue *q)
 	del_timer_sync(&q->unplug_timer);
 	del_timer_sync(&q->timeout);
 	cancel_work_sync(&q->unplug_work);
+	throtl_shutdown_timer_wq(q);
 }
 EXPORT_SYMBOL(blk_sync_queue);
 
@@ -396,25 +396,17 @@ EXPORT_SYMBOL(blk_sync_queue);
  */
 void __blk_run_queue(struct request_queue *q)
 {
-	blk_remove_plug(q);
-
 	if (unlikely(blk_queue_stopped(q)))
 		return;
-
-	if (elv_queue_empty(q))
-		return;
-
-	/*
-	 * Only recurse once to avoid overrunning the stack, let the unplug
-	 * handling reinvoke the handler shortly if we already got there.
-	 */
-	if (!queue_flag_test_and_set(QUEUE_FLAG_REENTER, q)) {
+    
+	if (!q->notified_urgent &&
+		q->elevator->elevator_type->ops.elevator_is_urgent_fn &&
+		q->urgent_request_fn &&
+		q->elevator->elevator_type->ops.elevator_is_urgent_fn(q)) {
+		q->notified_urgent = true;
+		q->urgent_request_fn(q);
+	} else
 		q->request_fn(q);
-		queue_flag_clear(QUEUE_FLAG_REENTER, q);
-	} else {
-		queue_flag_set(QUEUE_FLAG_PLUGGED, q);
-		kblockd_schedule_work(q, &q->unplug_work);
-	}
 }
 EXPORT_SYMBOL(__blk_run_queue);
 
@@ -458,6 +450,8 @@ void blk_cleanup_queue(struct request_queue *q)
 
 	if (q->elevator)
 		elevator_exit(q->elevator);
+
+	blk_throtl_exit(q);
 
 	blk_put_queue(q);
 }
@@ -515,11 +509,17 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 		return NULL;
 	}
 
+	if (blk_throtl_init(q)) {
+		kmem_cache_free(blk_requestq_cachep, q);
+		return NULL;
+	}
+
 	setup_timer(&q->backing_dev_info.laptop_mode_wb_timer,
 		    laptop_mode_timer_fn, (unsigned long) q);
 	init_timer(&q->unplug_timer);
 	setup_timer(&q->timeout, blk_rq_timed_out_timer, (unsigned long) q);
 	INIT_LIST_HEAD(&q->timeout_list);
+	INIT_LIST_HEAD(&q->pending_flushes);
 	INIT_WORK(&q->unplug_work, blk_unplug_work);
 
 	kobject_init(&q->kobj, &blk_queue_ktype);
@@ -608,6 +608,7 @@ blk_init_allocated_queue_node(struct request_queue *q, request_fn_proc *rfn,
 
 	q->request_fn		= rfn;
 	q->prep_rq_fn		= NULL;
+	q->unprep_rq_fn		= NULL;
 	q->unplug_fn		= generic_unplug_device;
 	q->queue_flags		= QUEUE_FLAG_DEFAULT;
 	q->queue_lock		= lock;
@@ -988,6 +989,50 @@ void blk_requeue_request(struct request_queue *q, struct request *rq)
 EXPORT_SYMBOL(blk_requeue_request);
 
 /**
+ * blk_reinsert_request() - Insert a request back to the scheduler
+ * @q:		request queue
+ * @rq:		request to be inserted
+ *
+ * This function inserts the request back to the scheduler as if
+ * it was never dispatched.
+ *
+ * Return: 0 on success, error code on fail
+ */
+int blk_reinsert_request(struct request_queue *q, struct request *rq)
+{
+	if (unlikely(!rq) || unlikely(!q))
+		return -EIO;
+    
+	blk_delete_timer(rq);
+	blk_clear_rq_complete(rq);
+	trace_block_rq_requeue(q, rq);
+    
+	if (blk_rq_tagged(rq))
+		blk_queue_end_tag(q, rq);
+    
+	BUG_ON(blk_queued_rq(rq));
+    
+	return elv_reinsert_request(q, rq);
+}
+EXPORT_SYMBOL(blk_reinsert_request);
+
+/**
+ * blk_reinsert_req_sup() - check whether the scheduler supports
+ *          reinsertion of requests
+ * @q:		request queue
+ *
+ * Returns true if the current scheduler supports reinserting
+ * request. False otherwise
+ */
+bool blk_reinsert_req_sup(struct request_queue *q)
+{
+	if (unlikely(!q))
+		return false;
+	return q->elevator->elevator_type->ops.elevator_reinsert_req_fn ? true : false;
+}
+EXPORT_SYMBOL(blk_reinsert_req_sup);
+
+/**
  * blk_insert_request - insert a special request into a request queue
  * @q:		request queue where request should be inserted
  * @rq:		request to be inserted
@@ -1035,22 +1080,6 @@ void blk_insert_request(struct request_queue *q, struct request *rq,
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 EXPORT_SYMBOL(blk_insert_request);
-
-/*
- * add-request adds a request to the linked list.
- * queue lock is held and interrupts disabled, as we muck with the
- * request queue list.
- */
-static inline void add_request(struct request_queue *q, struct request *req)
-{
-	drive_stat_acct(req, 1);
-
-	/*
-	 * elevator indicated where it wants this request to be
-	 * inserted at elevator_merge time
-	 */
-	__elv_add_request(q, req, ELEVATOR_INSERT_SORT, 0);
-}
 
 static void part_round_stats_single(int cpu, struct hd_struct *part,
 				    unsigned long now)
@@ -1135,30 +1164,46 @@ void blk_put_request(struct request *req)
 }
 EXPORT_SYMBOL(blk_put_request);
 
+/**
+ * blk_add_request_payload - add a payload to a request
+ * @rq: request to update
+ * @page: page backing the payload
+ * @len: length of the payload.
+ *
+ * This allows to later add a payload to an already submitted request by
+ * a block driver.  The driver needs to take care of freeing the payload
+ * itself.
+ *
+ * Note that this is a quite horrible hack and nothing but handling of
+ * discard requests should ever use it.
+ */
+void blk_add_request_payload(struct request *rq, struct page *page,
+		unsigned int len)
+{
+	struct bio *bio = rq->bio;
+
+	bio->bi_io_vec->bv_page = page;
+	bio->bi_io_vec->bv_offset = 0;
+	bio->bi_io_vec->bv_len = len;
+
+	bio->bi_size = len;
+	bio->bi_vcnt = 1;
+	bio->bi_phys_segments = 1;
+
+	rq->__data_len = rq->resid_len = len;
+	rq->nr_phys_segments = 1;
+	rq->buffer = bio_data(bio);
+}
+EXPORT_SYMBOL_GPL(blk_add_request_payload);
+
 void init_request_from_bio(struct request *req, struct bio *bio)
 {
 	req->cpu = bio->bi_comp_cpu;
 	req->cmd_type = REQ_TYPE_FS;
 
-	/*
-	 * Inherit FAILFAST from bio (for read-ahead, and explicit
-	 * FAILFAST).  FAILFAST flags are identical for req and bio.
-	 */
-	if (bio_rw_flagged(bio, BIO_RW_AHEAD))
+	req->cmd_flags |= bio->bi_rw & REQ_COMMON_MASK;
+	if (bio->bi_rw & REQ_RAHEAD)
 		req->cmd_flags |= REQ_FAILFAST_MASK;
-	else
-		req->cmd_flags |= bio->bi_rw & REQ_FAILFAST_MASK;
-
-	if (bio_rw_flagged(bio, BIO_RW_DISCARD))
-		req->cmd_flags |= REQ_DISCARD;
-	if (bio_rw_flagged(bio, BIO_RW_BARRIER))
-		req->cmd_flags |= REQ_HARDBARRIER;
-	if (bio_rw_flagged(bio, BIO_RW_SYNCIO))
-		req->cmd_flags |= REQ_RW_SYNC;
-	if (bio_rw_flagged(bio, BIO_RW_META))
-		req->cmd_flags |= REQ_RW_META;
-	if (bio_rw_flagged(bio, BIO_RW_NOIDLE))
-		req->cmd_flags |= REQ_NOIDLE;
 
 	req->errors = 0;
 	req->__sector = bio->bi_sector;
@@ -1181,16 +1226,19 @@ static int __make_request(struct request_queue *q, struct bio *bio)
 	int el_ret;
 	unsigned int bytes = bio->bi_size;
 	const unsigned short prio = bio_prio(bio);
-	const bool sync = bio_rw_flagged(bio, BIO_RW_SYNCIO);
-	const bool unplug = bio_rw_flagged(bio, BIO_RW_UNPLUG);
+	const bool sync = (bio->bi_rw & REQ_SYNC);
+	const bool unplug = (bio->bi_rw & REQ_UNPLUG);
 	const unsigned int ff = bio->bi_rw & REQ_FAILFAST_MASK;
+	int where = ELEVATOR_INSERT_SORT;
 	int rw_flags;
 
-	if (bio_rw_flagged(bio, BIO_RW_BARRIER) &&
-	    (q->next_ordered == QUEUE_ORDERED_NONE)) {
+	/* REQ_HARDBARRIER is no more */
+	if (WARN_ONCE(bio->bi_rw & REQ_HARDBARRIER,
+		"block: HARDBARRIER is deprecated, use FLUSH/FUA instead\n")) {
 		bio_endio(bio, -EOPNOTSUPP);
 		return 0;
 	}
+
 	/*
 	 * low level driver can indicate that it wants pages above a
 	 * certain limit bounced to low memory (ie for highmem, or even
@@ -1200,7 +1248,12 @@ static int __make_request(struct request_queue *q, struct bio *bio)
 
 	spin_lock_irq(q->queue_lock);
 
-	if (unlikely(bio_rw_flagged(bio, BIO_RW_BARRIER)) || elv_queue_empty(q))
+	if (bio->bi_rw & (REQ_FLUSH | REQ_FUA)) {
+		where = ELEVATOR_INSERT_FRONT;
+		goto get_rq;
+	}
+
+	if (elv_queue_empty(q))
 		goto get_rq;
 
 	el_ret = elv_merge(q, &req, bio);
@@ -1275,7 +1328,7 @@ get_rq:
 	 */
 	rw_flags = bio_data_dir(bio);
 	if (sync)
-		rw_flags |= REQ_RW_SYNC;
+		rw_flags |= REQ_SYNC;
 
 	/*
 	 * Grab a free request. This is might sleep but can not fail.
@@ -1297,7 +1350,10 @@ get_rq:
 		req->cpu = blk_cpu_to_group(smp_processor_id());
 	if (queue_should_plug(q) && elv_queue_empty(q))
 		blk_plug_device(q);
-	add_request(q, req);
+
+	/* insert the request into the elevator */
+	drive_stat_acct(req, 1);
+	__elv_add_request(q, req, where, 0);
 out:
 	if (unplug || !queue_should_plug(q))
 		__generic_unplug_device(q);
@@ -1464,7 +1520,7 @@ static inline void __generic_make_request(struct bio *bio)
 			goto end_io;
 		}
 
-		if (unlikely(!bio_rw_flagged(bio, BIO_RW_DISCARD) &&
+		if (unlikely(!(bio->bi_rw & REQ_DISCARD) &&
 			     nr_sectors > queue_max_hw_sectors(q))) {
 			printk(KERN_ERR "bio too big device %s (%u > %u)\n",
 			       bdevname(bio->bi_bdev, b),
@@ -1497,11 +1553,35 @@ static inline void __generic_make_request(struct bio *bio)
 		if (bio_check_eod(bio, nr_sectors))
 			goto end_io;
 
-		if (bio_rw_flagged(bio, BIO_RW_DISCARD) &&
-		    !blk_queue_discard(q)) {
+		/*
+		 * Filter flush bio's early so that make_request based
+		 * drivers without flush support don't have to worry
+		 * about them.
+		 */
+		if ((bio->bi_rw & (REQ_FLUSH | REQ_FUA)) && !q->flush_flags) {
+			bio->bi_rw &= ~(REQ_FLUSH | REQ_FUA);
+			if (!nr_sectors) {
+				err = 0;
+				goto end_io;
+			}
+		}
+
+		if ((bio->bi_rw & REQ_DISCARD) &&
+		    (!blk_queue_discard(q) ||
+		     ((bio->bi_rw & REQ_SECURE) &&
+		      !blk_queue_secdiscard(q)))) {
 			err = -EOPNOTSUPP;
 			goto end_io;
 		}
+
+		blk_throtl_bio(q, &bio);
+
+		/*
+		 * If bio = NULL, bio has been throttled and will be submitted
+		 * later.
+		 */
+		if (!bio)
+			break;
 
 		trace_block_bio_queue(q, bio);
 
@@ -1583,7 +1663,7 @@ void submit_bio(int rw, struct bio *bio)
 	 * If it's a regular read/write or a barrier with data attached,
 	 * go through the normal accounting stuff before submission.
 	 */
-	if (bio_has_data(bio) && !(rw & (1 << BIO_RW_DISCARD))) {
+	if (bio_has_data(bio) && !(rw & REQ_DISCARD)) {
 		if (rw & WRITE) {
 			count_vm_events(PGPGOUT, count);
 		} else {
@@ -1619,7 +1699,7 @@ EXPORT_SYMBOL(submit_bio);
  *    the insertion using this generic function.
  *
  *    This function should also be useful for request stacking drivers
- *    in some cases below, so export this fuction.
+ *    in some cases below, so export this function.
  *    Request stacking drivers like request-based dm may change the queue
  *    limits while requests are in the queue (e.g. dm's table swapping).
  *    Such request stacking drivers should check those requests agaist
@@ -1629,6 +1709,9 @@ EXPORT_SYMBOL(submit_bio);
  */
 int blk_rq_check_limits(struct request_queue *q, struct request *rq)
 {
+	if (rq->cmd_flags & REQ_DISCARD)
+		return 0;
+
 	if (blk_rq_sectors(rq) > queue_max_sectors(q) ||
 	    blk_rq_bytes(rq) > queue_max_hw_sectors(q) << 9) {
 		printk(KERN_ERR "%s: over max size limit.\n", __func__);
@@ -1747,11 +1830,11 @@ static void blk_account_io_completion(struct request *req, unsigned int bytes)
 static void blk_account_io_done(struct request *req)
 {
 	/*
-	 * Account IO completion.  bar_rq isn't accounted as a normal
-	 * IO on queueing nor completion.  Accounting the containing
-	 * request is enough.
+	 * Account IO completion.  flush_rq isn't accounted as a
+	 * normal IO on queueing nor completion.  Accounting the
+	 * containing request is enough.
 	 */
-	if (blk_do_io_stat(req) && req != &req->q->bar_rq) {
+	if (blk_do_io_stat(req) && req != &req->q->flush_rq) {
 		unsigned long duration = jiffies - req->start_time;
 		const int rw = rq_data_dir(req);
 		struct hd_struct *part;
@@ -1797,7 +1880,7 @@ struct request *blk_peek_request(struct request_queue *q)
 			 * sees this request (possibly after
 			 * requeueing).  Notify IO scheduler.
 			 */
-			if (blk_sorted_rq(rq))
+			if (rq->cmd_flags & REQ_SORTED)
 				elv_activate_rq(q, rq);
 
 			/*
@@ -1939,8 +2022,17 @@ struct request *blk_fetch_request(struct request_queue *q)
 	struct request *rq;
 
 	rq = blk_peek_request(q);
-	if (rq)
-		blk_start_request(rq);
+    if (rq) {
+        /*
+         * Assumption: the next request fetched from scheduler after we
+         * notified "urgent request pending" - will be the urgent one
+         */
+        if (q->notified_urgent && !q->dispatched_urgent) {
+            q->dispatched_urgent = true;
+            (void)blk_mark_rq_urgent(rq);
+        }
+ 		blk_start_request(rq);
+    }
 	return rq;
 }
 EXPORT_SYMBOL(blk_fetch_request);
@@ -1985,10 +2077,11 @@ bool blk_update_request(struct request *req, int error, unsigned int nr_bytes)
 	 * TODO: tj: This is too subtle.  It would be better to let
 	 * low level drivers do what they see fit.
 	 */
-	if (blk_fs_request(req))
+	if (req->cmd_type == REQ_TYPE_FS)
 		req->errors = 0;
 
-	if (error && (blk_fs_request(req) && !(req->cmd_flags & REQ_QUIET))) {
+	if (error && req->cmd_type == REQ_TYPE_FS &&
+	    !(req->cmd_flags & REQ_QUIET)) {
 		printk(KERN_ERR "end_request: I/O error, dev %s, sector %llu\n",
 				req->rq_disk ? req->rq_disk->disk_name : "?",
 				(unsigned long long)blk_rq_pos(req));
@@ -2075,7 +2168,7 @@ bool blk_update_request(struct request *req, int error, unsigned int nr_bytes)
 	req->buffer = bio_data(req->bio);
 
 	/* update sector only for requests with clear definition of sector */
-	if (blk_fs_request(req) || blk_discard_rq(req))
+	if (req->cmd_type == REQ_TYPE_FS || (req->cmd_flags & REQ_DISCARD))
 		req->__sector += total_bytes >> 9;
 
 	/* mixed attributes always follow the first bio */
@@ -2112,10 +2205,31 @@ static bool blk_update_bidi_request(struct request *rq, int error,
 	    blk_update_request(rq->next_rq, error, bidi_bytes))
 		return true;
 
-	add_disk_randomness(rq->rq_disk);
+	if (blk_queue_add_random(rq->q))
+		add_disk_randomness(rq->rq_disk);
 
 	return false;
 }
+
+/**
+ * blk_unprep_request - unprepare a request
+ * @req:	the request
+ *
+ * This function makes a request ready for complete resubmission (or
+ * completion).  It happens only after all error handling is complete,
+ * so represents the appropriate moment to deallocate any resources
+ * that were allocated to the request in the prep_rq_fn.  The queue
+ * lock is held when calling this.
+ */
+void blk_unprep_request(struct request *req)
+{
+	struct request_queue *q = req->q;
+
+	req->cmd_flags &= ~REQ_DONTPREP;
+	if (q->unprep_rq_fn)
+		q->unprep_rq_fn(q, req);
+}
+EXPORT_SYMBOL_GPL(blk_unprep_request);
 
 /*
  * queue lock must be held
@@ -2127,10 +2241,14 @@ static void blk_finish_request(struct request *req, int error)
 
 	BUG_ON(blk_queued_rq(req));
 
-	if (unlikely(laptop_mode) && blk_fs_request(req))
+	if (unlikely(laptop_mode) && req->cmd_type == REQ_TYPE_FS)
 		laptop_io_completion(&req->q->backing_dev_info);
 
 	blk_delete_timer(req);
+
+	if (req->cmd_flags & REQ_DONTPREP)
+		blk_unprep_request(req);
+
 
 	blk_account_io_done(req);
 
@@ -2364,7 +2482,7 @@ void blk_rq_bio_prep(struct request_queue *q, struct request *rq,
 		     struct bio *bio)
 {
 	/* Bit 0 (R/W) is identical in rq->cmd_flags and bio->bi_rw */
-	rq->cmd_flags |= bio->bi_rw & REQ_RW;
+	rq->cmd_flags |= bio->bi_rw & REQ_WRITE;
 
 	if (bio_has_data(bio)) {
 		rq->nr_phys_segments = bio_phys_segments(q, bio);
@@ -2450,7 +2568,7 @@ EXPORT_SYMBOL_GPL(blk_rq_unprep_clone);
 static void __blk_rq_prep_clone(struct request *dst, struct request *src)
 {
 	dst->cpu = src->cpu;
-	dst->cmd_flags = (rq_data_dir(src) | REQ_NOMERGE);
+	dst->cmd_flags = (src->cmd_flags & REQ_CLONE_MASK) | REQ_NOMERGE;
 	dst->cmd_type = src->cmd_type;
 	dst->__sector = blk_rq_pos(src);
 	dst->__data_len = blk_rq_bytes(src);
@@ -2529,6 +2647,13 @@ int kblockd_schedule_work(struct request_queue *q, struct work_struct *work)
 	return queue_work(kblockd_workqueue, work);
 }
 EXPORT_SYMBOL(kblockd_schedule_work);
+
+int kblockd_schedule_delayed_work(struct request_queue *q,
+			struct delayed_work *dwork, unsigned long delay)
+{
+	return queue_delayed_work(kblockd_workqueue, dwork, delay);
+}
+EXPORT_SYMBOL(kblockd_schedule_delayed_work);
 
 int __init blk_dev_init(void)
 {

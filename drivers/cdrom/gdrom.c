@@ -32,6 +32,7 @@
 #include <linux/blkdev.h>
 #include <linux/interrupt.h>
 #include <linux/device.h>
+#include <linux/smp_lock.h>
 #include <linux/wait.h>
 #include <linux/workqueue.h>
 #include <linux/platform_device.h>
@@ -509,7 +510,13 @@ static int gdrom_bdops_mediachanged(struct gendisk *disk)
 static int gdrom_bdops_ioctl(struct block_device *bdev, fmode_t mode,
 	unsigned cmd, unsigned long arg)
 {
-	return cdrom_ioctl(gd.cd_info, bdev, mode, cmd, arg);
+	int ret;
+
+	lock_kernel();
+	ret = cdrom_ioctl(gd.cd_info, bdev, mode, cmd, arg);
+	unlock_kernel();
+
+	return ret;
 }
 
 static const struct block_device_operations gdrom_bdops = {
@@ -517,7 +524,7 @@ static const struct block_device_operations gdrom_bdops = {
 	.open			= gdrom_bdops_open,
 	.release		= gdrom_bdops_release,
 	.media_changed		= gdrom_bdops_mediachanged,
-	.locked_ioctl		= gdrom_bdops_ioctl,
+	.ioctl			= gdrom_bdops_ioctl,
 };
 
 static irqreturn_t gdrom_command_interrupt(int irq, void *dev_id)
@@ -643,7 +650,7 @@ static void gdrom_request(struct request_queue *rq)
 	struct request *req;
 
 	while ((req = blk_fetch_request(rq)) != NULL) {
-		if (!blk_fs_request(req)) {
+		if (req->cmd_type != REQ_TYPE_FS) {
 			printk(KERN_DEBUG "GDROM: Non-fs request ignored\n");
 			__blk_end_request_all(req, -EIO);
 			continue;

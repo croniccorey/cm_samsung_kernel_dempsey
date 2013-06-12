@@ -40,6 +40,7 @@
 #include <linux/module.h>
 #include <linux/completion.h>
 #include <linux/proc_fs.h>
+#include <linux/smp_lock.h>
 #include <linux/seq_file.h>
 #include <linux/scatterlist.h>
 
@@ -168,7 +169,13 @@ static int viocd_blk_ioctl(struct block_device *bdev, fmode_t mode,
 		unsigned cmd, unsigned long arg)
 {
 	struct disk_info *di = bdev->bd_disk->private_data;
-	return cdrom_ioctl(&di->viocd_info, bdev, mode, cmd, arg);
+	int ret;
+
+	lock_kernel();
+	ret = cdrom_ioctl(&di->viocd_info, bdev, mode, cmd, arg);
+	unlock_kernel();
+
+	return ret;
 }
 
 static int viocd_blk_media_changed(struct gendisk *disk)
@@ -181,7 +188,7 @@ static const struct block_device_operations viocd_fops = {
 	.owner =		THIS_MODULE,
 	.open =			viocd_blk_open,
 	.release =		viocd_blk_release,
-	.locked_ioctl =		viocd_blk_ioctl,
+	.ioctl =		viocd_blk_ioctl,
 	.media_changed =	viocd_blk_media_changed,
 };
 
@@ -298,7 +305,7 @@ static void do_viocd_request(struct request_queue *q)
 	struct request *req;
 
 	while ((rwreq == 0) && ((req = blk_fetch_request(q)) != NULL)) {
-		if (!blk_fs_request(req))
+		if (req->cmd_type != REQ_TYPE_FS)
 			__blk_end_request_all(req, -EIO);
 		else if (send_request(req) < 0) {
 			printk(VIOCD_KERN_WARNING
