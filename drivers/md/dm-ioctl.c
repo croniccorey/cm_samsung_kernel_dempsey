@@ -1124,26 +1124,7 @@ static int populate_table(struct dm_table *table,
 		next = spec->next;
 	}
 
-	r = dm_table_set_type(table);
-	if (r) {
-		DMWARN("unable to set table type");
-		return r;
-	}
-
 	return dm_table_complete(table);
-}
-
-static int table_prealloc_integrity(struct dm_table *t,
-				    struct mapped_device *md)
-{
-	struct list_head *devices = dm_table_get_devices(t);
-	struct dm_dev_internal *dd;
-
-	list_for_each_entry(dd, devices, list)
-		if (bdev_get_integrity(dd->dm_dev.bdev))
-			return blk_integrity_register(dm_disk(md), NULL);
-
-	return 0;
 }
 
 static int table_load(struct dm_ioctl *param, size_t param_size)
@@ -1167,21 +1148,30 @@ static int table_load(struct dm_ioctl *param, size_t param_size)
 		goto out;
 	}
 
-	r = table_prealloc_integrity(t, md);
-	if (r) {
-		DMERR("%s: could not register integrity profile.",
-		      dm_device_name(md));
+	/* Protect md->type and md->queue against concurrent table loads. */
+	dm_lock_md_type(md);
+	if (dm_get_md_type(md) == DM_TYPE_NONE)
+		/* Initial table load: acquire type of table. */
+		dm_set_md_type(md, dm_table_get_type(t));
+	else if (dm_get_md_type(md) != dm_table_get_type(t)) {
+		DMWARN("can't change device type after initial table load.");
 		dm_table_destroy(t);
+		dm_unlock_md_type(md);
+		r = -EINVAL;
 		goto out;
 	}
 
-	r = dm_table_alloc_md_mempools(t);
+	/* setup md->queue to reflect md's type (may block) */
+	r = dm_setup_md_queue(md);
 	if (r) {
-		DMWARN("unable to allocate mempools for this table");
+		DMWARN("unable to set up device queue for new table.");
 		dm_table_destroy(t);
+		dm_unlock_md_type(md);
 		goto out;
 	}
+	dm_unlock_md_type(md);
 
+	/* stage inactive table */
 	down_write(&_hash_lock);
 	hc = dm_get_mdptr(md);
 	if (!hc || hc->md != md) {
@@ -1611,11 +1601,14 @@ static const struct file_operations _ctl_fops = {
 };
 
 static struct miscdevice _dm_misc = {
-	.minor 		= MISC_DYNAMIC_MINOR,
+	.minor		= MAPPER_CTRL_MINOR,
 	.name  		= DM_NAME,
-	.nodename	= "mapper/control",
+	.nodename	= DM_DIR "/" DM_CONTROL_NODE,
 	.fops  		= &_ctl_fops
 };
+
+MODULE_ALIAS_MISCDEV(MAPPER_CTRL_MINOR);
+MODULE_ALIAS("devname:" DM_DIR "/" DM_CONTROL_NODE);
 
 /*
  * Create misc character device and link to DM_DIR/control.

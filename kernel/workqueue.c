@@ -2763,6 +2763,13 @@ struct workqueue_struct *__alloc_workqueue_key(const char *name,
 	struct workqueue_struct *wq;
 	unsigned int cpu;
 
+  	  /*
+	   * Workqueues which may be used during memory reclaim should
+	   * have a rescuer to guarantee forward progress.
+	   */
+	  if (flags & WQ_MEM_RECLAIM)
+	    flags |= WQ_RESCUER;
+
 	/*
 	 * Unbound workqueues aren't concurrency managed and should be
 	 * dispatched to workers immediately.
