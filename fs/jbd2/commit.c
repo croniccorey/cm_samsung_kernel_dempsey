@@ -373,7 +373,7 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	int tag_bytes = journal_tag_bytes(journal);
 	struct buffer_head *cbh = NULL; /* For transactional checksums */
 	__u32 crc32_sum = ~0;
-	int write_op = WRITE;
+	int write_op = WRITE_SYNC;
 
 	/*
 	 * First job: lock down the current transaction and wait for
@@ -730,8 +730,7 @@ start_journal_io:
 	if (commit_transaction->t_flushed_data_blocks &&
 	    (journal->j_fs_dev != journal->j_dev) &&
 	    (journal->j_flags & JBD2_BARRIER))
-		blkdev_issue_flush(journal->j_fs_dev, GFP_KERNEL, NULL,
-			BLKDEV_IFL_WAIT);
+		blkdev_issue_flush(journal->j_fs_dev, GFP_KERNEL, NULL);
 
 	/* Done it all: now write the commit record asynchronously. */
 	if (JBD2_HAS_INCOMPAT_FEATURE(journal,
@@ -741,8 +740,7 @@ start_journal_io:
 		if (err)
 			__jbd2_journal_abort_hard(journal);
 		if (journal->j_flags & JBD2_BARRIER)
-			blkdev_issue_flush(journal->j_dev, GFP_KERNEL, NULL,
-				BLKDEV_IFL_WAIT);
+			blkdev_issue_flush(journal->j_fs_dev, GFP_KERNEL, NULL);
 	}
 
 	err = journal_finish_inode_data_buffers(journal, commit_transaction);

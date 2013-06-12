@@ -32,6 +32,7 @@
 #include <linux/errno.h>
 #include <linux/genhd.h>
 #include <linux/seq_file.h>
+#include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/ide.h>
@@ -577,7 +578,8 @@ static ide_startstop_t idetape_do_request(ide_drive_t *drive,
 		      rq->cmd[0], (unsigned long long)blk_rq_pos(rq),
 		      blk_rq_sectors(rq));
 
-	BUG_ON(!(blk_special_request(rq) || blk_sense_request(rq)));
+	BUG_ON(!(rq->cmd_type == REQ_TYPE_SPECIAL ||
+		 rq->cmd_type == REQ_TYPE_SENSE));
 
 	/* Retry a failed packet command */
 	if (drive->failed_pc && drive->pc->c[0] == REQUEST_SENSE) {
@@ -1926,9 +1928,14 @@ static int idetape_ioctl(struct block_device *bdev, fmode_t mode,
 {
 	struct ide_tape_obj *tape = ide_drv_g(bdev->bd_disk, ide_tape_obj);
 	ide_drive_t *drive = tape->drive;
-	int err = generic_ide_ioctl(drive, bdev, cmd, arg);
+	int err;
+
+	lock_kernel();
+	err = generic_ide_ioctl(drive, bdev, cmd, arg);
 	if (err == -EINVAL)
 		err = idetape_blkdev_ioctl(drive, cmd, arg);
+	unlock_kernel();
+
 	return err;
 }
 
@@ -1936,7 +1943,7 @@ static const struct block_device_operations idetape_block_ops = {
 	.owner		= THIS_MODULE,
 	.open		= idetape_open,
 	.release	= idetape_release,
-	.locked_ioctl	= idetape_ioctl,
+	.ioctl		= idetape_ioctl,
 };
 
 static int ide_tape_probe(ide_drive_t *drive)

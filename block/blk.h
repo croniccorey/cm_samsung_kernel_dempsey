@@ -30,6 +30,7 @@ void __generic_unplug_device(struct request_queue *);
  */
 enum rq_atomic_flags {
 	REQ_ATOM_COMPLETE = 0,
+    REQ_ATOM_URGENT = 1,
 };
 
 /*
@@ -46,10 +47,22 @@ static inline void blk_clear_rq_complete(struct request *rq)
 	clear_bit(REQ_ATOM_COMPLETE, &rq->atomic_flags);
 }
 
+static inline int blk_mark_rq_urgent(struct request *rq)
+{
+    return test_and_set_bit(REQ_ATOM_URGENT, &rq->atomic_flags);
+}
+
+static inline void blk_clear_rq_urgent(struct request *rq)
+{
+    clear_bit(REQ_ATOM_URGENT, &rq->atomic_flags);
+}
+
 /*
  * Internal elevator interface
  */
 #define ELV_ON_HASH(rq)		(!hlist_unhashed(&(rq)->hash))
+
+struct request *blk_do_flush(struct request_queue *q, struct request *rq);
 
 static inline struct request *__elv_next_request(struct request_queue *q)
 {
@@ -58,7 +71,11 @@ static inline struct request *__elv_next_request(struct request_queue *q)
 	while (1) {
 		while (!list_empty(&q->queue_head)) {
 			rq = list_entry_rq(q->queue_head.next);
-			if (blk_do_ordered(q, &rq))
+			if (!(rq->cmd_flags & (REQ_FLUSH | REQ_FUA)) ||
+			    rq == &q->flush_rq)
+				return rq;
+			rq = blk_do_flush(q, rq);
+			if (rq)
 				return rq;
 		}
 
@@ -133,24 +150,20 @@ static inline int queue_congestion_off_threshold(struct request_queue *q)
 	return q->nr_congestion_off;
 }
 
-#if defined(CONFIG_BLK_DEV_INTEGRITY)
-
-#define rq_for_each_integrity_segment(bvl, _rq, _iter)		\
-	__rq_for_each_bio(_iter.bio, _rq)			\
-		bip_for_each_vec(bvl, _iter.bio->bi_integrity, _iter.i)
-
-#endif /* BLK_DEV_INTEGRITY */
-
 static inline int blk_cpu_to_group(int cpu)
 {
+	int group = NR_CPUS;
 #ifdef CONFIG_SCHED_MC
 	const struct cpumask *mask = cpu_coregroup_mask(cpu);
-	return cpumask_first(mask);
+	group = cpumask_first(mask);
 #elif defined(CONFIG_SCHED_SMT)
-	return cpumask_first(topology_thread_cpumask(cpu));
+	group = cpumask_first(topology_thread_cpumask(cpu));
 #else
 	return cpu;
 #endif
+	if (likely(group < NR_CPUS))
+		return group;
+	return cpu;
 }
 
 /*
@@ -162,8 +175,10 @@ static inline int blk_cpu_to_group(int cpu)
  */
 static inline int blk_do_io_stat(struct request *rq)
 {
-	return rq->rq_disk && blk_rq_io_stat(rq) &&
-	       (blk_fs_request(rq) || blk_discard_rq(rq));
+	return rq->rq_disk &&
+	       (rq->cmd_flags & REQ_IO_STAT) &&
+	       (rq->cmd_type == REQ_TYPE_FS ||
+	        (rq->cmd_flags & REQ_DISCARD));
 }
 
 #endif
