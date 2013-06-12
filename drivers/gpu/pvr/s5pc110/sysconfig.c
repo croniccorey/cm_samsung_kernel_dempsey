@@ -36,10 +36,8 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 
-#ifdef CONFIG_DVFS_LIMIT
+#if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
 #include <mach/cpu-freq-v210.h>
-#else
-#include <linux/cpufreq.h>
 #endif
 
 #define REAL_HARDWARE 1
@@ -89,50 +87,15 @@ IMG_UINT32   PVRSRV_BridgeDispatchKM( IMG_UINT32  Ioctl,
 
 #if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
 
-/*
-* We need to keep the memory bus speed up when the GPU is active.
-* On the  S5PV210, it is bound to the CPU freq.
-* In arch/arm/mach-s5pv210/cpufreq.c, the bus speed is only lowered when the
-* CPU freq is below 200MHz.
-*/
-#define MIN_CPU_KHZ_FREQ 200000
-
 static struct clk *g3d_clock;
 static struct regulator *g3d_pd_regulator;
 
-#ifndef CONFIG_DVFS_LIMIT
-static int limit_adjust_cpufreq_notifier(struct notifier_block *nb,
-unsigned long event, void *data)
-{
-struct cpufreq_policy *policy = data;
-
-if (event != CPUFREQ_ADJUST)
-return 0;
-
-/* This is our indicator of GPU activity */
-if (regulator_is_enabled(g3d_pd_regulator))
-cpufreq_verify_within_limits(policy, MIN_CPU_KHZ_FREQ,
-policy->cpuinfo.max_freq);
-
-return 0;
-}
-
-static struct notifier_block cpufreq_limit_notifier = {
-.notifier_call = limit_adjust_cpufreq_notifier,
-};
-#endif
-
 static PVRSRV_ERROR EnableSGXClocks(void)
 {
-#ifdef CONFIG_DVFS_LIMIT
-s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_PVR, L5); /* 200 MHz */
-#endif
 	regulator_enable(g3d_pd_regulator);
 	clk_enable(g3d_clock);
-#ifndef CONFIG_DVFS_LIMIT
-	cpufreq_update_policy(current_thread_info()->cpu);
-#endif
 
+	s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_PVR, L5);
 	return PVRSRV_OK;
 }
 
@@ -140,11 +103,7 @@ static PVRSRV_ERROR DisableSGXClocks(void)
 {
 	clk_disable(g3d_clock);
 	regulator_disable(g3d_pd_regulator);
-#ifdef CONFIG_DVFS_LIMIT
-s5pv210_unlock_dvfs_high_level(DVFS_LOCK_TOKEN_PVR);
-#else
-	cpufreq_update_policy(current_thread_info()->cpu);
-#endif
+	s5pv210_unlock_dvfs_high_level(DVFS_LOCK_TOKEN_PVR);
 
 	return PVRSRV_OK;
 }
@@ -476,10 +435,6 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 
 #if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
 	DisableSGXClocks();
-#ifndef CONFIG_DVFS_LIMIT
-cpufreq_register_notifier(&cpufreq_limit_notifier,
-CPUFREQ_POLICY_NOTIFIER);
-#endif
 #endif
 
 	return PVRSRV_OK;
@@ -579,17 +534,6 @@ PVRSRV_ERROR SysDeinitialise (SYS_DATA *psSysData)
 	}
 
 	psSysSpecData = (SYS_SPECIFIC_DATA *) psSysData->pvSysSpecificData;
-
-#if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
-/* TODO: regulator and clk put. */
-#ifdef CONFIG_DVFS_LIMIT
-s5pv210_unlock_dvfs_high_level(DVFS_LOCK_TOKEN_PVR);
-#else
-cpufreq_unregister_notifier(&cpufreq_limit_notifier,
-CPUFREQ_POLICY_NOTIFIER);
-cpufreq_update_policy(current_thread_info()->cpu);
-#endif
-#endif
 
 #if defined(SYS_USING_INTERRUPTS)
 	if (psSysSpecData->ui32SysSpecificData & SYS_SPECIFIC_DATA_ENABLE_LISR)
