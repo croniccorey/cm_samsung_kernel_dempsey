@@ -15,6 +15,14 @@
 extern struct files_struct init_files;
 extern struct fs_struct init_fs;
 
+#ifdef CONFIG_CGROUPS
+#define INIT_THREADGROUP_FORK_LOCK(sig)                                        \
+       .threadgroup_fork_lock =                                        \
+               __RWSEM_INITIALIZER(sig.threadgroup_fork_lock),
+#else
+#define INIT_THREADGROUP_FORK_LOCK(sig)
+#endif
+
 #define INIT_SIGNALS(sig) {						\
 	.nr_threads	= 1,						\
 	.wait_chldexit	= __WAIT_QUEUE_HEAD_INITIALIZER(sig.wait_chldexit),\
@@ -29,6 +37,7 @@ extern struct fs_struct init_fs;
 		.running = 0,						\
 		.lock = __SPIN_LOCK_UNLOCKED(sig.cputimer.lock),	\
 	},								\
+	INIT_THREADGROUP_FORK_LOCK(sig)                                 \
 }
 
 extern struct nsproxy init_nsproxy;
@@ -82,11 +91,17 @@ extern struct group_info init_groups;
 # define CAP_INIT_BSET  CAP_FULL_SET
 
 #ifdef CONFIG_TREE_PREEMPT_RCU
+#define INIT_TASK_RCU_TREE_PREEMPT()          \
+  .rcu_blocked_node = NULL,
+#else
+#define INIT_TASK_RCU_TREE_PREEMPT(tsk)
+#endif
+#ifdef CONFIG_PREEMPT_RCU
 #define INIT_TASK_RCU_PREEMPT(tsk)					\
 	.rcu_read_lock_nesting = 0,					\
 	.rcu_read_unlock_special = 0,					\
-	.rcu_blocked_node = NULL,					\
-	.rcu_node_entry = LIST_HEAD_INIT(tsk.rcu_node_entry),
+	.rcu_node_entry = LIST_HEAD_INIT(tsk.rcu_node_entry),    \
+	INIT_TASK_RCU_TREE_PREEMPT()
 #else
 #define INIT_TASK_RCU_PREEMPT(tsk)
 #endif
