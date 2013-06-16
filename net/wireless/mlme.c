@@ -1076,6 +1076,17 @@ void cfg80211_cqm_pktloss_notify(struct net_device *dev,
 }
 EXPORT_SYMBOL(cfg80211_cqm_pktloss_notify);
 
+void cfg80211_gtk_rekey_notify(struct net_device *dev, const u8 *bssid,
+             const u8 *replay_ctr, gfp_t gfp)
+{
+  struct wireless_dev *wdev = dev->ieee80211_ptr;
+  struct wiphy *wiphy = wdev->wiphy;
+  struct cfg80211_registered_device *rdev = wiphy_to_dev(wiphy);
+
+  nl80211_gtk_rekey_notify(rdev, dev, bssid, replay_ctr, gfp);
+}
+EXPORT_SYMBOL(cfg80211_gtk_rekey_notify);
+
 bool cfg80211_rx_spurious_frame(struct net_device *dev,
         const u8 *addr, gfp_t gfp)
 {
