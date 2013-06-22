@@ -54,13 +54,13 @@ enum sched_tunable_scaling sysctl_sched_tunable_scaling
  * Minimal preemption granularity for CPU-bound tasks:
  * (default: 2 msec * (1 + ilog(ncpus)), units: nanoseconds)
  */
-unsigned int sysctl_sched_min_granularity = 750000ULL;
-unsigned int normalized_sysctl_sched_min_granularity = 750000ULL;
+unsigned int sysctl_sched_min_granularity = 2000000ULL;
+unsigned int normalized_sysctl_sched_min_granularity = 2000000ULL;
 
 /*
  * is kept at sysctl_sched_latency / sysctl_sched_min_granularity
  */
-static unsigned int sched_nr_latency = 8;
+static unsigned int sched_nr_latency = 3;
 
 /*
  * After fork, child runs first. If set to 0 (default) then
@@ -875,9 +875,6 @@ check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 	if (cfs_rq->nr_running > 1) {
 		struct sched_entity *se = __pick_next_entity(cfs_rq);
 		s64 delta = curr->vruntime - se->vruntime;
-
-		if (delta < 0)
-			return;
 
 		if (delta > ideal_runtime)
 			resched_task(rq_of(cfs_rq)->curr);

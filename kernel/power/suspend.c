@@ -166,10 +166,8 @@ static int suspend_enter(suspend_state_t state)
 
 	error = sysdev_suspend(PMSG_SUSPEND);
 	if (!error) {
-		if (!suspend_test(TEST_CORE) && pm_check_wakeup_events()) {
+		if (!suspend_test(TEST_CORE))
 			error = suspend_ops->enter(state);
-			events_check_enabled = false;
-		}
 		sysdev_resume();
 	}
 
@@ -211,6 +209,7 @@ int suspend_devices_and_enter(suspend_state_t state)
 			goto Close;
 	}
 	suspend_console();
+	pm_restrict_gfp_mask();
 	suspend_test_start();
 	error = dpm_suspend_start(PMSG_SUSPEND);
 	if (error) {
@@ -227,6 +226,7 @@ int suspend_devices_and_enter(suspend_state_t state)
 	suspend_test_start();
 	dpm_resume_end(PMSG_RESUME);
 	suspend_test_finish("resume devices");
+	pm_restore_gfp_mask();
 	resume_console();
  Close:
 	if (suspend_ops->end)
@@ -286,9 +286,7 @@ int enter_state(suspend_state_t state)
 		goto Finish;
 
 	pr_debug("PM: Entering %s sleep\n", pm_states[state]);
-	pm_restrict_gfp_mask();
 	error = suspend_devices_and_enter(state);
-	pm_restore_gfp_mask();
 
  Finish:
 	pr_debug("PM: Finishing wakeup.\n");
