@@ -153,7 +153,7 @@ extern s3c_gpio_pull_t s3c_gpio_getpull(unsigned int pin);
 /* Define values for the drvstr available for each gpio pin.
  *
  * These values control the value of the output signal driver strength,
- * configurable on most pins on the S5C series.
+ * configurable on most pins on the S5P series.
  */
 #define S5P_GPIO_DRVSTR_LV1	((__force s5p_gpio_drvstr_t)0x0)
 #define S5P_GPIO_DRVSTR_LV2	((__force s5p_gpio_drvstr_t)0x2)
