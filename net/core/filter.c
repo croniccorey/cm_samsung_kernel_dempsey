@@ -39,7 +39,7 @@
 #include <linux/filter.h>
 
 /* No hurry in this branch */
-static void *__load_pointer(struct sk_buff *skb, int k)
+static void *__load_pointer(const struct sk_buff *skb, int k)
 {
 	u8 *ptr = NULL;
 
@@ -53,7 +53,7 @@ static void *__load_pointer(struct sk_buff *skb, int k)
 	return NULL;
 }
 
-static inline void *load_pointer(struct sk_buff *skb, int k,
+static inline void *load_pointer(const struct sk_buff *skb, int k,
 				 unsigned int size, void *buffer)
 {
 	if (k >= 0)
@@ -110,7 +110,8 @@ EXPORT_SYMBOL(sk_filter);
  * and last instruction guaranteed to be a RET, we dont need to check
  * flen. (We used to pass to this function the length of filter)
  */
-unsigned int sk_run_filter(struct sk_buff *skb, const struct sock_filter *fentry)
+unsigned int sk_run_filter(const struct sk_buff *skb,
+         const struct sock_filter *fentry)
 {
 	void *ptr;
 	u32 A = 0;			/* Accumulator */
