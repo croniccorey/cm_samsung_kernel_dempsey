@@ -826,7 +826,7 @@ cull_mlocked:
 
 activate_locked:
 		/* Not a candidate for swapping, so reclaim swap space. */
-		if (PageSwapCache(page) && vm_swap_full())
+		if (PageSwapCache(page))
 			try_to_free_swap(page);
 		VM_BUG_ON(PageActive(page));
 		SetPageActive(page);
@@ -990,7 +990,7 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
 			 * anon page which don't already have a swap slot is
 			 * pointless.
 			 */
-			if (nr_swap_pages <= 0 && PageAnon(cursor_page) &&
+			if (unlikely(nr_swap_pages <= 0) && PageAnon(cursor_page) &&
 					!PageSwapCache(cursor_page))
 				continue;
 
@@ -1248,7 +1248,7 @@ static unsigned long shrink_inactive_list(unsigned long max_scan,
 		nr_freed = shrink_page_list(&page_list, sc, PAGEOUT_IO_ASYNC);
 
 		/* Check if we should syncronously wait for writeback */
-		if (should_reclaim_stall(nr_taken, nr_reclaimed, priority, sc)) {
+		if (should_reclaim_stall(nr_taken, nr_freed, priority, sc)) {
 			congestion_wait(BLK_RW_ASYNC, HZ/10);
 
 			/*
@@ -1612,7 +1612,7 @@ static void get_scan_count(struct zone *zone, struct scan_control *sc,
 	int noswap = 0;
 
 	/* If we have no swap space, do not bother scanning anon pages. */
-	if (!sc->may_swap || (nr_swap_pages <= 0)) {
+	if ((!sc->may_swap || (unlikely(nr_swap_pages <= 0)))) {
 		noswap = 1;
 		fraction[0] = 0;
 		fraction[1] = 1;
@@ -1870,7 +1870,6 @@ static unsigned long do_try_to_free_pages(struct zonelist *zonelist,
 	int priority;
 	unsigned long total_scanned = 0;
 	struct reclaim_state *reclaim_state = current->reclaim_state;
-	unsigned long lru_pages = 0;
 	struct zoneref *z;
 	struct zone *zone;
 	enum zone_type high_zoneidx = gfp_zone(sc->gfp_mask);
@@ -1881,18 +1880,6 @@ static unsigned long do_try_to_free_pages(struct zonelist *zonelist,
 
 	if (scanning_global_lru(sc))
 		count_vm_event(ALLOCSTALL);
-	/*
-	 * mem_cgroup will not do shrink_slab.
-	 */
-	if (scanning_global_lru(sc)) {
-		for_each_zone_zonelist(zone, z, zonelist, high_zoneidx) {
-
-			if (!cpuset_zone_allowed_hardwall(zone, GFP_KERNEL))
-				continue;
-
-			lru_pages += zone_reclaimable_pages(zone);
-		}
-	}
 
 	for (priority = DEF_PRIORITY; priority >= 0; priority--) {
 		sc->nr_scanned = 0;
@@ -1904,6 +1891,14 @@ static unsigned long do_try_to_free_pages(struct zonelist *zonelist,
 		 * over limit cgroups
 		 */
 		if (scanning_global_lru(sc)) {
+			unsigned long lru_pages = 0;
+			for_each_zone_zonelist(zone, z, zonelist, high_zoneidx) {
+				if (!cpuset_zone_allowed_hardwall(zone, GFP_KERNEL))
+					continue;
+
+				lru_pages += zone_reclaimable_pages(zone);
+			}
+
 			shrink_slab(sc->nr_scanned, sc->gfp_mask, lru_pages);
 			if (reclaim_state) {
 				sc->nr_reclaimed += reclaim_state->reclaimed_slab;
@@ -2448,7 +2443,7 @@ unsigned long global_reclaimable_pages(void)
 	nr = global_page_state(NR_ACTIVE_FILE) +
 	     global_page_state(NR_INACTIVE_FILE);
 
-	if (nr_swap_pages > 0)
+	if (likely(nr_swap_pages > 0))
 		nr += global_page_state(NR_ACTIVE_ANON) +
 		      global_page_state(NR_INACTIVE_ANON);
 
@@ -2462,7 +2457,7 @@ unsigned long zone_reclaimable_pages(struct zone *zone)
 	nr = zone_page_state(zone, NR_ACTIVE_FILE) +
 	     zone_page_state(zone, NR_INACTIVE_FILE);
 
-	if (nr_swap_pages > 0)
+	if (likely(nr_swap_pages > 0))
 		nr += zone_page_state(zone, NR_ACTIVE_ANON) +
 		      zone_page_state(zone, NR_INACTIVE_ANON);
 
@@ -2677,7 +2672,6 @@ static int __zone_reclaim(struct zone *zone, gfp_t gfp_mask, unsigned int order)
 	};
 	unsigned long slab_reclaimable;
 
-	disable_swap_token();
 	cond_resched();
 	/*
 	 * We need to be able to allocate from the reserves for RECLAIM_SWAP
