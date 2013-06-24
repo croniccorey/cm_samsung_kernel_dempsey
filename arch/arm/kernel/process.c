@@ -29,7 +29,9 @@
 #include <linux/utsname.h>
 #include <linux/uaccess.h>
 
+#include <asm/cacheflush.h>
 #include <asm/leds.h>
+#include <asm/cacheflush.h>
 #include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/thread_notify.h>
@@ -89,10 +91,9 @@ __setup("hlt", hlt_setup);
 
 void arm_machine_restart(char mode, const char *cmd)
 {
-	/*
-	 * Clean and disable cache, and turn off interrupts
-	 */
-	cpu_proc_fin();
+	/* Disable interrupts first */
+	local_irq_disable();
+	local_fiq_disable();
 
 	/*
 	 * Tell the mm system that we are going to reboot -
@@ -108,6 +109,15 @@ void arm_machine_restart(char mode, const char *cmd)
 #endif
 	writel(0x12345678, S5P_INFORM5);  /* Reset */
 #endif
+
+	/* Clean and invalidate caches */
+	flush_cache_all();
+
+	/* Turn off caching */
+	cpu_proc_fin();
+
+	/* Push out any further dirty data, and ensure cache is empty */
+	flush_cache_all();
 
 	/*
 	 * Now call the architecture specific reboot code.
@@ -159,10 +169,9 @@ void cpu_idle(void)
 
 	/* endless idle loop with no priority at all */
 	while (1) {
-		tick_nohz_stop_sched_tick(1);
-		leds_event(led_idle_start);
-		idle_notifier_call_chain(IDLE_START);
 		while (!need_resched()) {
+		idle_notifier_call_chain(IDLE_START);
+		tick_nohz_stop_sched_tick(1);
 #ifdef CONFIG_HOTPLUG_CPU
 			if (cpu_is_offline(smp_processor_id()))
 				cpu_die();
@@ -185,9 +194,8 @@ void cpu_idle(void)
 				local_irq_enable();
 			}
 		}
-		leds_event(led_idle_end);
-		idle_notifier_call_chain(IDLE_END);
 		tick_nohz_restart_sched_tick();
+		idle_notifier_call_chain(IDLE_END);
 		preempt_enable_no_resched();
 		schedule();
 		preempt_disable();
