@@ -142,7 +142,7 @@ dhd_customer_gpio_wlan_ctrl(int onoff)
 			bcm_wlan_power_on(2);
 #endif /* CUSTOMER_HW */
 #if defined(CUSTOMER_HW2) || defined(CUSTOMER_HW_SAMSUNG)
-			wifi_set_power(1, 200);
+			wifi_set_power(1, 0);
 #endif
 			WL_ERROR(("=========== WLAN going back to live  ========\n"));
 		break;
@@ -247,16 +247,6 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"SK", "SK", 1},
 	{"TR", "TR", 7},
 	{"TW", "TW", 2},
-#ifdef CUSTOMER_HW_SAMSUNG
-	{"IR", "XZ", 11},	 /* Universal if Country code is IRAN, (ISLAMIC REPUBLIC OF) */
-	{"SD", "XZ", 11},	 /* Universal if Country code is SUDAN */
-	{"SY", "XZ", 11},	 /* Universal if Country code is SYRIAN ARAB REPUBLIC */
-	{"GL", "XZ", 11},	 /* Universal if Country code is GREENLAND */
-	{"PS", "XZ", 11},	 /* Universal if Country code is PALESTINIAN TERRITORY, OCCUPIED */
-	{"TL", "XZ", 11},	 /* Universal if Country code is TIMOR-LESTE (EAST TIMOR) */
-	{"MH", "XZ", 11},	 /* Universal if Country code is MARSHALL ISLANDS */
-	{"PK", "XZ", 11},	 /* Universal if Country code is PAKISTAN*/
-#endif
 #ifdef BCM4334_CHIP
 	{"RU", "RU", 5},
 	{"SG", "SG", 4},
