@@ -1828,7 +1828,7 @@ void skb_copy_and_csum_dev(const struct sk_buff *skb, u8 *to)
 	long csstart;
 
 	if (skb->ip_summed == CHECKSUM_PARTIAL)
-		csstart = skb->csum_start - skb_headroom(skb);
+		csstart = skb_checksum_start_offset(skb);
 	else
 		csstart = skb_headlen(skb);
 
@@ -3023,7 +3023,7 @@ void skb_tstamp_tx(struct sk_buff *orig_skb,
 	} else {
 		/*
 		 * no hardware time stamps available,
-		 * so keep the skb_shared_tx and only
+		 * so keep the shared tx_flags and only
 		 * store software time stamp
 		 */
 		skb->tstamp = ktime_get_real();
