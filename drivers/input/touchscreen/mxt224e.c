@@ -394,7 +394,7 @@ uint8_t calibrate_chip(void)
 			/* set flag to show we must still confirm if calibration was good or bad */
 			cal_check_flag = 1u;
 			Doing_calibration_falg = 1; 
-			printk(KERN_ERR "[TSP] calibration success!!!\n");
+	//		printk(KERN_ERR "[TSP] calibration success!!!\n");
 		}
 
 	}
@@ -719,7 +719,7 @@ void check_chip_calibration(unsigned char one_touch_input_flag)
 				ret = get_object_info(copy_data, GEN_ACQUISITIONCONFIG_T8, &size, &object_address);
 				write_mem(copy_data, object_address+4, 1, &data_byte);	/* TCHAUTOCAL 1sec */
 				read_mem(copy_data, object_address+4, 1, &val);
-				printk(KERN_DEBUG"[TSP] auto calibration enable state is %d!!!\n",val);
+//				printk(KERN_DEBUG"[TSP] auto calibration enable state is %d!!!\n",val);
 				auto_cal_flag = 1;
 	       }
 
@@ -752,7 +752,7 @@ void check_chip_calibration(unsigned char one_touch_input_flag)
 
 					if (boot_or_resume == 1) {
 						boot_or_resume = 0;						
-						printk(KERN_ERR "[TSP] ta_status is %d", is_cable_attached);
+	//					printk(KERN_ERR "[TSP] ta_status is %d", is_cable_attached);
 
 						if ((is_cable_attached == 0) && !(copy_data->family_id==0x81))
 			            	mxt224_ta_probe(is_cable_attached);
@@ -776,7 +776,7 @@ void check_chip_calibration(unsigned char one_touch_input_flag)
 			qt_time_point = jiffies_to_msecs(jiffies);
 		} else {
 			/* we cannot confirm if good or bad - we must wait for next touch  message to confirm */
-			printk(KERN_ERR"[TSP] calibration was not decided yet\n");
+	//		printk(KERN_ERR"[TSP] calibration was not decided yet\n");
 			cal_check_flag = 1u;
 			qt_timer_state = 0;
 			qt_time_point = jiffies_to_msecs(jiffies);
@@ -1089,7 +1089,7 @@ void palm_recovery(void)
 
 		/* TCHAUTOCAL Disable */
 		ret = write_mem(copy_data, obj_address+4, 1, &atchcalst_tmp);	/* TCHAUTOCAL */
-        printk(KERN_DEBUG"[TSP] auto calibration disable!!!\n");
+//        printk(KERN_DEBUG"[TSP] auto calibration disable!!!\n");
 
 	} else {
 		/*	printk(KERN_ERR"[TSP]ret is %d,ret1 is %d\n",ret,ret1); */
@@ -1263,7 +1263,7 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 		{
 			//printk(KERN_ERR"[TSP] Starting irq with 0x%2x, 0x%2x, 0x%2x, 0x%2x, 0x%2x, 0x%2x, 0x%2x, 0x%2x \n", msg[0], msg[1], msg[2], msg[3], msg[4], msg[5], msg[6], msg[7]);
 			if ((msg[1]&0x10) == 0x10) /* caliration */
-				printk(KERN_ERR"[TSP] Calibration!!!!!!");
+	//			printk(KERN_ERR"[TSP] Calibration!!!!!!");
 			else if ((msg[1]&0x40) == 0x40) /* overflow */
 			{
 				printk(KERN_ERR"[TSP] Overflow!!!!!!");
@@ -1278,7 +1278,7 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 			}
 			else if ((msg[1]&0x10) == 0x00) {/* caliration */
 				Doing_calibration_falg = 0; 
-				printk(KERN_ERR"[TSP] Calibration End!!!!!!");
+	//			printk(KERN_ERR"[TSP] Calibration End!!!!!!");
 
 				if(cal_check_flag == 0)
 				{
