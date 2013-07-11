@@ -38,11 +38,13 @@
 #include <linux/input.h>
 #include <linux/irq.h>
 #include <linux/skbuff.h>
+#include <linux/console.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/setup.h>
 #include <asm/mach-types.h>
+#include <asm/system.h>
 
 #if defined(CONFIG_TOUCHSCREEN_MXT224E)
 #include <linux/i2c/mxt224e.h>
@@ -209,16 +211,8 @@ static int aries_notifier_call(struct notifier_block *this,
 	int mode = REBOOT_MODE_NONE;
 
 	if ((code == SYS_RESTART) && _cmd) {
-		if (!strcmp((char *)_cmd, "arm11_fota"))
-			mode = REBOOT_MODE_ARM11_FOTA;
-		else if (!strcmp((char *)_cmd, "arm9_fota"))
-			mode = REBOOT_MODE_ARM9_FOTA;
-		else if (!strcmp((char *)_cmd, "recovery"))
-			mode = REBOOT_MODE_RECOVERY;
-		else if (!strcmp((char *)_cmd, "bootloader"))
-			mode = REBOOT_MODE_FAST_BOOT;
-		else if (!strcmp((char *)_cmd, "download"))
-			mode = REBOOT_MODE_DOWNLOAD;
+		if (!strcmp((char *)_cmd, "recovery"))
+			mode = 2; // It's not REBOOT_MODE_RECOVERY, blame Samsung
 		else
 			mode = REBOOT_MODE_NONE;
 	}
@@ -1545,7 +1539,7 @@ static struct max8998_adc_table_data temper_table[] =  {
 	{ 1485, 	30 	},
 	{ 1504, 	20 	},	
 	{ 1525, 	10 	}, // +10
-	{ 1547, 	0 	}, // 10 // 0¥ì¥ì ¢¯A¥ì¥ì
+	{ 1547, 	0 	}, // 10 // 0\A5\EC\A5\EC \A2\AFA\A5\EC\A5\EC
 	{ 1562, 	-10 	},
 	{ 1585, 	-20 	},
 	{ 1595, 	-30 	},
@@ -1554,7 +1548,7 @@ static struct max8998_adc_table_data temper_table[] =  {
 	{ 1641,		-60 	},
 	{ 1652, 	-70 	},
 	{ 1667, 	-80 	},
-	{ 1708, 	-100 	}, //-10¥ì¥ì ¢¯A¥ì¥ì
+	{ 1708, 	-100 	}, //-10\A5\EC\A5\EC \A2\AFA\A5\EC\A5\EC
 };
 #else
 static struct max8998_adc_table_data temper_table[] =  {
@@ -7653,10 +7647,74 @@ static void __init onenand_init()
 	clk_enable(clk);
 }
 
+static bool console_flushed;
+
+static void flush_console(void)
+{
+	if (console_flushed)
+		return;
+
+	console_flushed = true;
+
+	printk("\n");
+	pr_emerg("Restarting %s\n", linux_banner);
+	if (!try_acquire_console_sem())
+		release_console_sem();
+		return;
+
+	mdelay(50);
+
+	local_irq_disable();
+	if (try_acquire_console_sem())
+		pr_emerg("flush_console: console was locked! busting!\n");
+	else
+		pr_emerg("flush_console: console was locked!\n");
+	release_console_sem();
+}
+
+static void aries_pm_restart(char mode, const char *cmd)
+{
+	flush_console();
+
+	/* On a normal reboot, INFORM6 will contain a small integer
+	 * reason code from the notifier hook.  On a panic, it will
+	 * contain the 0xee we set at boot.  Write 0xbb to differentiate
+	 * a watchdog-timeout-and-reboot (0xee) from a controlled reboot
+	 * (0xbb)
+	 */
+	if (__raw_readl(S5P_INFORM6) == 0xee)
+		__raw_writel(0xbb, S5P_INFORM6);
+
+	arm_machine_restart(mode, cmd);
+}
+
+// Ugly hack to inject parameters (e.g. device serial, bootmode) into /proc/cmdline
+static void __init aries_inject_cmdline(void) {
+	char *new_command_line;
+	int bootmode = __raw_readl(S5P_INFORM6);
+	int size;
+
+	size = strlen(boot_command_line);
+	new_command_line = kmalloc(size + 40 + 11, GFP_KERNEL);
+	strcpy(new_command_line, saved_command_line);
+	size += sprintf(new_command_line + size, " androidboot.serialno=%08X%08X",
+				system_serial_high, system_serial_low);
+
+	// Only write bootmode when less than 10 to prevent confusion with watchdog
+	// reboot (0xee = 238)
+	if (bootmode < 10) {
+		size += sprintf(new_command_line + size, " bootmode=%d", bootmode);
+	}
+
+	saved_command_line = new_command_line;
+}
+
 static void __init aries_machine_init(void)
 {
+	arm_pm_restart = aries_pm_restart;
+	
 	setup_ram_console_mem();
-	s3c_usb_set_serial();
+	aries_inject_cmdline();
 	platform_add_devices(aries_devices, ARRAY_SIZE(aries_devices));
 
 	/* Find out S5PC110 chip version */
@@ -7874,6 +7932,12 @@ static void __init aries_machine_init(void)
 	}
 	gpio_free(GPIO_MSENSE_nRST);
 #endif
+
+	/* write something into the INFORM6 register that we can use to
+	 * differentiate an unclear reboot from a clean reboot (which
+	 * writes a small integer code to INFORM6).
+	 */
+	__raw_writel(0xee, S5P_INFORM6);
 }
 
 #ifdef CONFIG_USB_SUPPORT
