@@ -20,6 +20,10 @@
 #include <linux/regulator/consumer.h>
 #include <linux/mfd/max8998.h>
 
+#ifdef CONFIG_FORCE_FAST_CHARGE
+#include <linux/fastchg.h>
+#endif
+
 #ifdef CONFIG_REGULATOR_MAX8893			
 #include <linux/mfd/max8893.h>
 #endif
@@ -5896,41 +5900,35 @@ static struct i2c_board_info i2c_devs8[] __initdata = {
 static int fsa9480_init_flag = 0;
 static bool mtp_off_status;
 extern int max8998_check_vdcin();
-static void fsa9480_usb_cb(bool attached)
-{
-	struct usb_gadget *gadget = platform_get_drvdata(&s3c_device_usbgadget);
-
-	if (gadget) {
-		if (attached)
-			usb_gadget_vbus_connect(gadget);
-		else
-			usb_gadget_vbus_disconnect(gadget);
-	}
-
-	mtp_off_status = false;
-#if !defined (CONFIG_S5PC110_HAWK_BOARD) && !defined (CONFIG_S5PC110_KEPLER_BOARD) && !defined (CONFIG_S5PC110_DEMPSEY_BOARD) && !defined (CONFIG_S5PC110_VIBRANTPLUS_BOARD)		// mr work
-       if( max8998_check_vdcin())
-	set_cable_status = attached ? CABLE_TYPE_USB : CABLE_TYPE_NONE;
-	else
-	set_cable_status = CABLE_TYPE_NONE;	
-
-	if (charger_callbacks && charger_callbacks->set_cable)
-		charger_callbacks->set_cable(charger_callbacks, set_cable_status);
-#endif
-	
-}
-
 static void fsa9480_charger_cb(bool attached)
 {
-
-#if !defined (CONFIG_S5PC110_HAWK_BOARD) && !defined (CONFIG_S5PC110_KEPLER_BOARD) && !defined (CONFIG_S5PC110_DEMPSEY_BOARD) && !defined (CONFIG_S5PC110_VIBRANTPLUS_BOARD) // mr work
-       if( max8998_check_vdcin())
 	set_cable_status = attached ? CABLE_TYPE_AC : CABLE_TYPE_NONE;
-	else
-	set_cable_status = CABLE_TYPE_NONE;	
+        if (charger_callbacks && charger_callbacks->set_cable)
+                charger_callbacks->set_cable(charger_callbacks, set_cable_status);
 
-	if (charger_callbacks && charger_callbacks->set_cable)
-		charger_callbacks->set_cable(charger_callbacks, set_cable_status);
+}
+
+static void fsa9480_usb_cb(bool attached)
+{
+#ifdef CONFIG_FORCE_FAST_CHARGE
+        if (force_fast_charge != 0) {
+                fsa9480_charger_cb(attached);
+        } else {
+#endif
+                struct usb_gadget *gadget = platform_get_drvdata(&s3c_device_usbgadget);
+
+                if (gadget) {
+                        if (attached)
+                                usb_gadget_vbus_connect(gadget);
+                        else
+                                usb_gadget_vbus_disconnect(gadget);
+                }
+
+                set_cable_status = attached ? CABLE_TYPE_USB : CABLE_TYPE_NONE;
+                if (charger_callbacks && charger_callbacks->set_cable)
+                        charger_callbacks->set_cable(charger_callbacks, set_cable_status);
+#ifdef CONFIG_FORCE_FAST_CHARGE
+        }
 #endif
 
 }
@@ -5942,32 +5940,30 @@ static struct switch_dev switch_dock = {
 static void fsa9480_deskdock_cb(bool attached)
 {
 
-struct usb_gadget *gadget = platform_get_drvdata(&s3c_device_usbgadget);	//Build Error
+#ifdef CONFIG_FORCE_FAST_CHARGE
+        if (force_fast_charge != 0) {
+                fsa9480_charger_cb(attached);
+        } else {
+#endif
+                struct usb_gadget *gadget = platform_get_drvdata(&s3c_device_usbgadget);
 
 	if (attached)
-		switch_set_state(&switch_dock, 1);
-	else
-		switch_set_state(&switch_dock, 0);
+                        switch_set_state(&switch_dock, 1);
+                else
+                        switch_set_state(&switch_dock, 0);
 		
-#if !defined (CONFIG_S5PC110_HAWK_BOARD) && !defined (CONFIG_S5PC110_KEPLER_BOARD) && !defined (CONFIG_S5PC110_DEMPSEY_BOARD) && !defined (CONFIG_S5PC110_VIBRANTPLUS_BOARD) // mr work
-	if (gadget) 
-	{
-		if (attached)
-			usb_gadget_vbus_connect(gadget);
-		else
-			usb_gadget_vbus_disconnect(gadget);
-	}
+	if (gadget) {
+                        if (attached)
+                                usb_gadget_vbus_connect(gadget);
+                        else
+                                usb_gadget_vbus_disconnect(gadget);
+                }
 
-	mtp_off_status = false;
-
-       if( max8998_check_vdcin())
 	set_cable_status = attached ? CABLE_TYPE_USB : CABLE_TYPE_NONE;
-	else
-	set_cable_status = CABLE_TYPE_NONE;	
-
-	   
 	if (charger_callbacks && charger_callbacks->set_cable)
-		charger_callbacks->set_cable(charger_callbacks, set_cable_status);
+                        charger_callbacks->set_cable(charger_callbacks, set_cable_status);
+#ifdef CONFIG_FORCE_FAST_CHARGE
+        }
 #endif
 	
 }

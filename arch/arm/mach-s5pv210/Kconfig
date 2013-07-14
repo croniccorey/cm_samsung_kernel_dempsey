@@ -380,5 +380,12 @@ config CPU_DIDLE
 	bool "DEEP Idle"
 	depends on CPU_IDLE
 	default n
+
+config FORCE_FAST_CHARGE
+        tristate "Force AC charge mode at will"
+        default y
+        help
+          A simple sysfs interface to force adapters that
+          are detected as USB to charge as AC.
 	
 endif
